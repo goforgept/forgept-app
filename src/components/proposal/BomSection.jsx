@@ -222,9 +222,9 @@ export default function BomSection({
         )}
       </div>}
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
         <h3 className="text-fp-text font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Column picker — always available */}
           <div className="relative" ref={colMenuRef}>
             <button
@@ -445,112 +445,183 @@ export default function BomSection({
           <div className="space-y-6">
             {(() => {
               const ViewTable = ({ items }) => (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-fp-border">
-                        <th className="py-2 pr-2 w-8">
-                          <input type="checkbox" className="accent-fp-brand"
-                            checked={items.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && items.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
-                            onChange={() => {
-                              const orderable = items.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
-                              const allSelected = orderable.every(l => selectedForPO.has(l.id))
-                              setSelectedForPO(prev => {
-                                const next = new Set(prev)
-                                orderable.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
-                                return next
-                              })
-                            }} />
-                        </th>
-                        <th className="text-fp-muted text-left py-2 pr-4">Item</th>
-                        {col('mfr') && <th className="text-fp-muted text-left py-2 pr-4">Mfr</th>}
-                        {col('part_number') && <th className="text-fp-muted text-left py-2 pr-4">Part #</th>}
-                        {col('category') && <th className="text-fp-muted text-left py-2 pr-4">Category</th>}
-                        {col('vendor') && <th className="text-fp-muted text-left py-2 pr-4">Vendor</th>}
-                        <th className="text-fp-muted text-right py-2 pr-4">Qty</th>
-                        {col('your_cost') && <th className="text-fp-muted text-right py-2 pr-4">Your Cost</th>}
-                        {col('unit_price') && <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>}
-                        {col('msrp') && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
-                        {col('total') && <th className="text-fp-muted text-right py-2 pr-4">Total</th>}
-                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Lead Time</th>}
-                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
-                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
-                        <th className="text-fp-muted text-left py-2">Status</th>
-                        <th className="text-fp-muted text-center py-2 pr-2 text-xs">Recurring</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => {
-                        const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
-                        return (
-                          <tr key={item.id} className={`border-b border-fp-border/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
-                            <td className="pr-2 py-3">
-                              {!isOrdered && (
-                                <input type="checkbox" className="accent-fp-brand cursor-pointer"
-                                  checked={selectedForPO.has(item.id)}
-                                  onChange={() => setSelectedForPO(prev => {
-                                    const next = new Set(prev)
-                                    next.has(item.id) ? next.delete(item.id) : next.add(item.id)
-                                    return next
-                                  })} />
-                              )}
-                            </td>
-                            <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
-                            {col('mfr') && <td className="text-fp-muted py-3 pr-4">{item.manufacturer || '—'}</td>}
-                            {col('part_number') && <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>}
-                            {col('category') && <td className="text-fp-muted py-3 pr-4">{item.category}</td>}
-                            {col('vendor') && <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>}
-                            <td className="text-fp-text py-3 pr-4 text-right">{item.quantity}</td>
-                            {col('your_cost') && <td className="text-fp-muted py-3 pr-4 text-right">{item.your_cost_unit ? `$${fmt(item.your_cost_unit)}` : '—'}</td>}
-                            {col('unit_price') && <td className="py-2 pr-4 text-right">
-                              {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
-                                <input
-                                  type="number" min="0" step="0.01" autoFocus
-                                  value={editingPrice.value}
-                                  onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
-                                  onBlur={() => { onSaveLinePrice(item.id, editingPrice.value, item.quantity); setEditingPrice(null) }}
-                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
-                                  className="w-24 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs text-right focus:outline-none"
-                                />
-                              ) : (
-                                <span
-                                  onClick={() => canEdit && onSaveLinePrice && setEditingPrice({ type: 'bom', id: item.id, value: String(item.customer_price_unit || 0) })}
-                                  className={`text-fp-text text-sm ${canEdit && onSaveLinePrice ? 'cursor-text hover:bg-fp-inset rounded px-1 -mx-1 transition-colors' : ''}`}
-                                  title={canEdit && onSaveLinePrice ? 'Click to edit price' : undefined}
-                                >${fmt(item.customer_price_unit)}</span>
-                              )}
-                            </td>}
-                            {col('msrp') && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
-                            {col('total') && <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
-                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
-                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.country_of_origin || '—'}</td>}
-                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.berry_compliance || '—'}</td>}
-                            <td className="py-3">
-                              <div className="flex flex-col gap-1">
-                                <span className={`text-xs font-semibold px-2 py-1 rounded ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-fp-inset text-fp-muted'}`}>
-                                  {item.po_status || item.pricing_status}
-                                </span>
-                                {item.rfq_expires_at && item.pricing_status === 'RFQ Sent' && (() => {
-                                  const expired = new Date(item.rfq_expires_at) < new Date()
-                                  return expired ? <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-400">⚠ Pricing Expired</span> : <span className="text-xs px-2 py-0.5 rounded bg-fp-inset text-fp-muted">Exp {new Date(item.rfq_expires_at).toLocaleDateString()}</span>
-                                })()}
+                <>
+                  {/* Mobile card layout */}
+                  <div className="lg:hidden space-y-2">
+                    {items.map((item) => {
+                      const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                      return (
+                        <div key={item.id} className={`rounded-lg border p-3 transition-colors ${selectedForPO.has(item.id) ? 'border-[#C8622A]/40 bg-[#C8622A]/5' : 'border-fp-border bg-fp-inset'}`}>
+                          <div className="flex items-start gap-2">
+                            {!isOrdered && (
+                              <input type="checkbox" className="accent-fp-brand cursor-pointer mt-0.5 flex-shrink-0"
+                                checked={selectedForPO.has(item.id)}
+                                onChange={() => setSelectedForPO(prev => {
+                                  const next = new Set(prev)
+                                  next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                                  return next
+                                })} />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-fp-text text-sm font-semibold">{item.item_name}</p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                                {item.manufacturer && <span className="text-fp-muted text-xs">{item.manufacturer}</span>}
+                                {item.part_number_sku && <span className="text-fp-muted text-xs font-mono">{item.part_number_sku}</span>}
+                                {item.category && <span className="text-fp-muted text-xs">{item.category}</span>}
+                                {item.vendor && <span className="text-fp-muted text-xs">{item.vendor}</span>}
                               </div>
-                            </td>
-                            <td className="py-3 pr-2 text-center">
-                              <div className="flex flex-col items-center gap-1">
-                                <input type="checkbox" checked={!!item.recurring} onChange={() => onToggleRecurring(item.id, !!item.recurring)} className="accent-fp-brand cursor-pointer" title="Mark as recurring" />
-                                {item.recurring && proposal?.status === 'Won' && (
-                                  <input type="date" value={renewalDates[item.id] || item.renewal_date || ''} onChange={e => onSaveRenewalDate(item.id, e.target.value)}
-                                    className="bg-fp-inset text-[#C8622A] border border-[#C8622A]/40 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-fp-brand w-28" />
+                              <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-fp-muted text-xs">Qty: <span className="text-fp-text font-semibold">{item.quantity}</span></span>
+                                  {col('your_cost') && item.your_cost_unit && <span className="text-fp-muted text-xs">Cost: ${fmt(item.your_cost_unit)}</span>}
+                                  {col('unit_price') && (
+                                    <span className="text-xs">
+                                      {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
+                                        <input type="number" min="0" step="0.01" autoFocus
+                                          value={editingPrice.value}
+                                          onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
+                                          onBlur={() => { onSaveLinePrice(item.id, editingPrice.value, item.quantity); setEditingPrice(null) }}
+                                          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
+                                          className="w-20 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs focus:outline-none"
+                                        />
+                                      ) : (
+                                        <span onClick={() => canEdit && onSaveLinePrice && setEditingPrice({ type: 'bom', id: item.id, value: String(item.customer_price_unit || 0) })}
+                                          className={`text-fp-text ${canEdit && onSaveLinePrice ? 'cursor-text underline underline-offset-2 decoration-dotted' : ''}`}>
+                                          ${fmt(item.customer_price_unit)}
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                {col('total') && <span className="text-fp-text text-sm font-bold">${fmt(item.customer_price_total)}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-fp-border/50">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-fp-inset text-fp-muted'}`}>
+                              {item.po_status || item.pricing_status}
+                            </span>
+                            <label className="flex items-center gap-1.5 text-fp-muted text-xs cursor-pointer">
+                              <input type="checkbox" checked={!!item.recurring} onChange={() => onToggleRecurring(item.id, !!item.recurring)} className="accent-fp-brand cursor-pointer" />
+                              Recurring
+                            </label>
+                          </div>
+                          {item.recurring && proposal?.status === 'Won' && (
+                            <input type="date" value={renewalDates[item.id] || item.renewal_date || ''} onChange={e => onSaveRenewalDate(item.id, e.target.value)}
+                              className="mt-2 w-full bg-fp-inset text-[#C8622A] border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-fp-border">
+                          <th className="py-2 pr-2 w-8">
+                            <input type="checkbox" className="accent-fp-brand"
+                              checked={items.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && items.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
+                              onChange={() => {
+                                const orderable = items.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
+                                const allSelected = orderable.every(l => selectedForPO.has(l.id))
+                                setSelectedForPO(prev => {
+                                  const next = new Set(prev)
+                                  orderable.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
+                                  return next
+                                })
+                              }} />
+                          </th>
+                          <th className="text-fp-muted text-left py-2 pr-4">Item</th>
+                          {col('mfr') && <th className="text-fp-muted text-left py-2 pr-4">Mfr</th>}
+                          {col('part_number') && <th className="text-fp-muted text-left py-2 pr-4">Part #</th>}
+                          {col('category') && <th className="text-fp-muted text-left py-2 pr-4">Category</th>}
+                          {col('vendor') && <th className="text-fp-muted text-left py-2 pr-4">Vendor</th>}
+                          <th className="text-fp-muted text-right py-2 pr-4">Qty</th>
+                          {col('your_cost') && <th className="text-fp-muted text-right py-2 pr-4">Your Cost</th>}
+                          {col('unit_price') && <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>}
+                          {col('msrp') && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
+                          {col('total') && <th className="text-fp-muted text-right py-2 pr-4">Total</th>}
+                          {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Lead Time</th>}
+                          {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
+                          {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
+                          <th className="text-fp-muted text-left py-2">Status</th>
+                          <th className="text-fp-muted text-center py-2 pr-2 text-xs">Recurring</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item) => {
+                          const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                          return (
+                            <tr key={item.id} className={`border-b border-fp-border/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
+                              <td className="pr-2 py-3">
+                                {!isOrdered && (
+                                  <input type="checkbox" className="accent-fp-brand cursor-pointer"
+                                    checked={selectedForPO.has(item.id)}
+                                    onChange={() => setSelectedForPO(prev => {
+                                      const next = new Set(prev)
+                                      next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                                      return next
+                                    })} />
                                 )}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
+                              {col('mfr') && <td className="text-fp-muted py-3 pr-4">{item.manufacturer || '—'}</td>}
+                              {col('part_number') && <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>}
+                              {col('category') && <td className="text-fp-muted py-3 pr-4">{item.category}</td>}
+                              {col('vendor') && <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>}
+                              <td className="text-fp-text py-3 pr-4 text-right">{item.quantity}</td>
+                              {col('your_cost') && <td className="text-fp-muted py-3 pr-4 text-right">{item.your_cost_unit ? `$${fmt(item.your_cost_unit)}` : '—'}</td>}
+                              {col('unit_price') && <td className="py-2 pr-4 text-right">
+                                {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
+                                  <input
+                                    type="number" min="0" step="0.01" autoFocus
+                                    value={editingPrice.value}
+                                    onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
+                                    onBlur={() => { onSaveLinePrice(item.id, editingPrice.value, item.quantity); setEditingPrice(null) }}
+                                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
+                                    className="w-24 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs text-right focus:outline-none"
+                                  />
+                                ) : (
+                                  <span
+                                    onClick={() => canEdit && onSaveLinePrice && setEditingPrice({ type: 'bom', id: item.id, value: String(item.customer_price_unit || 0) })}
+                                    className={`text-fp-text text-sm ${canEdit && onSaveLinePrice ? 'cursor-text hover:bg-fp-inset rounded px-1 -mx-1 transition-colors' : ''}`}
+                                    title={canEdit && onSaveLinePrice ? 'Click to edit price' : undefined}
+                                  >${fmt(item.customer_price_unit)}</span>
+                                )}
+                              </td>}
+                              {col('msrp') && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
+                              {col('total') && <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
+                              {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
+                              {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.country_of_origin || '—'}</td>}
+                              {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.berry_compliance || '—'}</td>}
+                              <td className="py-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className={`text-xs font-semibold px-2 py-1 rounded ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-fp-inset text-fp-muted'}`}>
+                                    {item.po_status || item.pricing_status}
+                                  </span>
+                                  {item.rfq_expires_at && item.pricing_status === 'RFQ Sent' && (() => {
+                                    const expired = new Date(item.rfq_expires_at) < new Date()
+                                    return expired ? <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-400">⚠ Pricing Expired</span> : <span className="text-xs px-2 py-0.5 rounded bg-fp-inset text-fp-muted">Exp {new Date(item.rfq_expires_at).toLocaleDateString()}</span>
+                                  })()}
+                                </div>
+                              </td>
+                              <td className="py-3 pr-2 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <input type="checkbox" checked={!!item.recurring} onChange={() => onToggleRecurring(item.id, !!item.recurring)} className="accent-fp-brand cursor-pointer" title="Mark as recurring" />
+                                  {item.recurring && proposal?.status === 'Won' && (
+                                    <input type="date" value={renewalDates[item.id] || item.renewal_date || ''} onChange={e => onSaveRenewalDate(item.id, e.target.value)}
+                                      className="bg-fp-inset text-[#C8622A] border border-[#C8622A]/40 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-fp-brand w-28" />
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )
 
               const unsectioned = lineItems.filter(l => !l.section_id)
@@ -682,22 +753,12 @@ export default function BomSection({
                     const allLaborTotal = laborTotal + sectionLaborTotal
                     const adjustedGrandTotal = materialsTotal + allLaborTotal + taxAmount
                     return (
-                      <table className="w-full text-sm">
-                        <tfoot>
-                          <tr><td colSpan="6" className="text-fp-muted pt-4 text-right font-semibold">Materials Total</td><td className="text-fp-text pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                          {allLaborTotal > 0 && (
-                            <tr>
-                              <td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">
-                                Labor Total
-                              </td>
-                              <td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td></td>
-                            </tr>
-                          )}
-                          {taxRate > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Tax ({taxRate}% on materials)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
-                          <tr className="border-t border-fp-border"><td colSpan="6" className="text-fp-muted pt-3 text-right font-semibold">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                        </tfoot>
-                      </table>
+                      <div className="border-t border-fp-border pt-4 mt-4 space-y-1.5">
+                        <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Materials Total</span><span className="text-fp-text font-bold">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        {allLaborTotal > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Labor Total</span><span className="text-fp-text font-bold">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                        {taxRate > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Tax ({taxRate}% on materials)</span><span className="text-fp-text font-bold">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                        <div className="flex justify-between border-t border-fp-border pt-2 mt-1"><span className="text-fp-muted font-semibold">Grand Total</span><span className="text-[#C8622A] font-bold text-lg">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                      </div>
                     )
                   })()}
                 </>
