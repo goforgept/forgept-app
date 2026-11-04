@@ -2897,12 +2897,12 @@ export default function ProposalDetail({ isAdmin }) {
         .from('proposals')
         .insert({
           ...fields,
-          proposal_name: form.proposal_name,
+          proposal_name: form.proposalName,
           company:       form.company,
-          client_name:   form.client_name,
-          client_email:  form.client_email,
-          client_id:     null,
-          location_id:   null,
+          client_name:   form.clientName,
+          client_email:  form.clientEmail,
+          client_id:     form.clientId   || null,
+          location_id:   form.locationId || null,
           status:        'Draft',
           pipeline_stage_id: null,
           revision_number: 1,
@@ -4223,7 +4223,7 @@ const analyzeDrawing = async () => {
       {showEditClientModal && <EditClientModal allClients={allClients} editClientForm={editClientForm} setEditClientForm={setEditClientForm} savingClient={savingClient} onSave={saveClientInfo} onClose={() => setShowEditClientModal(false)} />}
 
       {showDeleteModal && <DeleteProposalModal proposal={proposal} deleteConfirmText={deleteConfirmText} setDeleteConfirmText={setDeleteConfirmText} deletingProposal={deletingProposal} onDelete={deleteProposal} onClose={() => setShowDeleteModal(false)} />}
-      {showDuplicateModal && <DuplicateProposalModal proposal={proposal} duplicating={duplicating} onDuplicate={duplicateProposal} onClose={() => setShowDuplicateModal(false)} />}
+      {showDuplicateModal && <DuplicateProposalModal proposal={proposal} orgId={profile?.org_id} duplicating={duplicating} onDuplicate={duplicateProposal} onClose={() => setShowDuplicateModal(false)} />}
 
       {showAIBOMModal && <AIBOMModal aiBOMPrompt={aiBOMPrompt} setAIBOMPrompt={setAIBOMPrompt} generatingBOM={generatingBOM} aiBOMPreview={aiBOMPreview} setAIBOMPreview={setAIBOMPreview} onGenerate={generateAIBOM} onApply={applyAIBOM} onClose={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} />}
       {showDealSummaryModal && <DealSummaryModal dealSummary={dealSummary} setDealSummary={setDealSummary} generatingDealSummary={generatingDealSummary} onGenerate={generateDealSummary} onClose={() => { setShowDealSummaryModal(false); setDealSummary(null) }} />}
