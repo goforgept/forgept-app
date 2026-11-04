@@ -13,6 +13,7 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Width
 import DrawingToolSummary from '../components/drawing/DrawingToolSummary'
 import ActivityTimeline from '../components/ActivityTimeline'
 import DeleteProposalModal from '../components/proposal/DeleteProposalModal'
+import DuplicateProposalModal from '../components/proposal/DuplicateProposalModal'
 import ShareModal from '../components/proposal/ShareModal'
 import SaveTemplateModal from '../components/proposal/SaveTemplateModal'
 import SendProposalModal from '../components/proposal/SendProposalModal'
@@ -131,6 +132,8 @@ export default function ProposalDetail({ isAdmin }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhotosModal, setShowPhotosModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [revisions, setRevisions] = useState([])
   const [showEditClientModal, setShowEditClientModal] = useState(false)
   const [editClientForm, setEditClientForm] = useState({ client_name: '', company: '', client_email: '' })
@@ -2884,6 +2887,62 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(prev => ({ ...prev, archived_at: null }))
   }
 
+  const duplicateProposal = async (form) => {
+    if (!proposal) return
+    setDuplicating(true)
+    try {
+      const { id: _id, created_at, archived_at, signing_token, signature_name, signature_at, signed_pdf_url,
+              quote_number, contract_number, qbo_invoice_id, revision_number, original_proposal_id, is_current_revision, ...fields } = proposal
+      const { data: newProposal, error } = await supabase
+        .from('proposals')
+        .insert({
+          ...fields,
+          proposal_name: form.proposal_name,
+          company:       form.company,
+          client_name:   form.client_name,
+          client_email:  form.client_email,
+          client_id:     null,
+          location_id:   null,
+          status:        'Draft',
+          pipeline_stage_id: null,
+          revision_number: 1,
+          original_proposal_id: null,
+          is_current_revision: true,
+        })
+        .select().single()
+      if (error || !newProposal) throw error || new Error('Failed to create duplicate')
+
+      // Copy sections with ID remapping so line items stay linked correctly
+      const { data: sects } = await supabase.from('proposal_sections').select('*').eq('proposal_id', id)
+      const sectionIdMap = {}
+      if (sects?.length) {
+        for (const { id: oldId, ...s } of sects) {
+          const { data: ns } = await supabase.from('proposal_sections').insert({ ...s, proposal_id: newProposal.id }).select().single()
+          if (ns) sectionIdMap[oldId] = ns.id
+        }
+      }
+
+      // Copy line items with remapped section IDs
+      const { data: lineItems } = await supabase.from('bom_line_items').select('*').eq('proposal_id', id)
+      if (lineItems?.length) {
+        await supabase.from('bom_line_items').insert(
+          lineItems.map(({ id: _, created_at: __, ...li }) => ({
+            ...li,
+            proposal_id: newProposal.id,
+            section_id:  li.section_id ? (sectionIdMap[li.section_id] ?? null) : null,
+          }))
+        )
+      }
+
+      setShowDuplicateModal(false)
+      navigate(`/proposal/${newProposal.id}`)
+    } catch (err) {
+      alert('Duplicate failed: ' + err.message)
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
   const createRevision = async () => {
     if (!proposal) return
     const originalId = proposal.original_proposal_id || id
@@ -3931,6 +3990,7 @@ const analyzeDrawing = async () => {
           setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
           onArchive={archiveProposal} onRestore={restoreProposal}
           onCreateRevision={createRevision}
+          onDuplicate={() => setShowDuplicateModal(true)}
           linkedJob={linkedJob} onCreateJob={createLinkedJob}
           canEdit={canEdit}
         />
@@ -4163,6 +4223,7 @@ const analyzeDrawing = async () => {
       {showEditClientModal && <EditClientModal allClients={allClients} editClientForm={editClientForm} setEditClientForm={setEditClientForm} savingClient={savingClient} onSave={saveClientInfo} onClose={() => setShowEditClientModal(false)} />}
 
       {showDeleteModal && <DeleteProposalModal proposal={proposal} deleteConfirmText={deleteConfirmText} setDeleteConfirmText={setDeleteConfirmText} deletingProposal={deletingProposal} onDelete={deleteProposal} onClose={() => setShowDeleteModal(false)} />}
+      {showDuplicateModal && <DuplicateProposalModal proposal={proposal} duplicating={duplicating} onDuplicate={duplicateProposal} onClose={() => setShowDuplicateModal(false)} />}
 
       {showAIBOMModal && <AIBOMModal aiBOMPrompt={aiBOMPrompt} setAIBOMPrompt={setAIBOMPrompt} generatingBOM={generatingBOM} aiBOMPreview={aiBOMPreview} setAIBOMPreview={setAIBOMPreview} onGenerate={generateAIBOM} onApply={applyAIBOM} onClose={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} />}
       {showDealSummaryModal && <DealSummaryModal dealSummary={dealSummary} setDealSummary={setDealSummary} generatingDealSummary={generatingDealSummary} onGenerate={generateDealSummary} onClose={() => { setShowDealSummaryModal(false); setDealSummary(null) }} />}

@@ -24,7 +24,7 @@ export default function ProposalHeader({
   onSaveDealAmount,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
-  onArchive, onRestore, onCreateRevision,
+  onArchive, onRestore, onCreateRevision, onDuplicate,
   canEdit = true,
 }) {
   const [quoteDraft,      setQuoteDraft]      = useState(proposal?.quote_number    ?? '')
@@ -72,6 +72,9 @@ export default function ProposalHeader({
     },
     isAdmin && !proposal?.archived_at && onCreateRevision && {
       label: '+ New Revision', action: onCreateRevision
+    },
+    isAdmin && onDuplicate && {
+      label: 'Duplicate', action: onDuplicate
     },
     isAdmin && !proposal?.archived_at && {
       label: 'Archive', action: onArchive
