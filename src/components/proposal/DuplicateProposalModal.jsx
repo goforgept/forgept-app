@@ -5,6 +5,7 @@ const inputCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounde
 
 export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, onClose, duplicating }) {
   const [proposalName, setProposalName] = useState(`Copy of ${proposal?.proposal_name || 'Proposal'}`)
+  const [closeDate,    setCloseDate]    = useState('')
   const [allClients,   setAllClients]   = useState([])
   const [companySearch, setCompanySearch] = useState(proposal?.company || '')
   const [showDropdown,  setShowDropdown]  = useState(false)
@@ -77,7 +78,7 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
   }
 
   const handleSubmit = () => {
-    onDuplicate({ proposalName, company, clientName, clientEmail, clientId: selectedClientId || null, locationId: locationId || null })
+    onDuplicate({ proposalName, company, clientName, clientEmail, clientId: selectedClientId || null, locationId: locationId || null, closeDate: closeDate || null })
   }
 
   return (
@@ -89,10 +90,16 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
         </div>
 
         <div className="space-y-4">
-          {/* Proposal name */}
-          <div>
-            <label className="text-fp-muted text-xs mb-1 block">Proposal Name</label>
-            <input type="text" value={proposalName} onChange={e => setProposalName(e.target.value)} className={inputCls} />
+          {/* Proposal name + close date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="text-fp-muted text-xs mb-1 block">Proposal Name</label>
+              <input type="text" value={proposalName} onChange={e => setProposalName(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-fp-muted text-xs mb-1 block">Close Date</label>
+              <input type="date" value={closeDate} onChange={e => setCloseDate(e.target.value)} className={inputCls} />
+            </div>
           </div>
 
           {/* Searchable company picker */}

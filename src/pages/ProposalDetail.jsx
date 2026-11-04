@@ -2912,6 +2912,7 @@ export default function ProposalDetail({ isAdmin }) {
           client_id:     form.clientId   || null,
           location_id:   form.locationId || null,
           quote_number:  quoteNumber || null,
+          close_date:    form.closeDate || null,
           status:        'Draft',
           pipeline_stage_id: null,
           revision_number: 1,
