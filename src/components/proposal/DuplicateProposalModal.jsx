@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 
 const inputCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
@@ -6,6 +6,8 @@ const inputCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounde
 export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, onClose, duplicating }) {
   const [proposalName, setProposalName] = useState(`Copy of ${proposal?.proposal_name || 'Proposal'}`)
   const [allClients,   setAllClients]   = useState([])
+  const [companySearch, setCompanySearch] = useState(proposal?.company || '')
+  const [showDropdown,  setShowDropdown]  = useState(false)
   const [selectedClientId, setSelectedClientId] = useState(proposal?.client_id || '')
   const [company,      setCompany]      = useState(proposal?.company      || '')
   const [clientName,   setClientName]   = useState(proposal?.client_name  || '')
@@ -14,15 +16,14 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
   const [locationId,   setLocationId]   = useState('')
   const [contacts,     setContacts]     = useState([])
   const [contactId,    setContactId]    = useState('__main__')
+  const dropdownRef = useRef(null)
 
-  // Load clients on mount
   useEffect(() => {
     supabase.from('clients').select('id, company, client_name, email').eq('org_id', orgId)
       .order('company', { ascending: true })
       .then(({ data }) => setAllClients(data || []))
   }, [orgId])
 
-  // Load locations + contacts when client changes
   useEffect(() => {
     if (!selectedClientId) { setLocations([]); setLocationId(''); setContacts([]); setContactId('__main__'); return }
     supabase.from('client_locations').select('id, site_name, address, city, state').eq('client_id', selectedClientId)
@@ -35,14 +36,33 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
     setContactId('__main__')
   }, [selectedClientId])
 
-  const handleClientChange = (cid) => {
-    setSelectedClientId(cid)
-    const found = allClients.find(c => c.id === cid)
-    if (found) {
-      setCompany(found.company || '')
-      setClientName(found.client_name || '')
-      setClientEmail(found.email || '')
-    }
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showDropdown) return
+    const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showDropdown])
+
+  // Deduplicate companies by name, keeping one client per unique company
+  const uniqueCompanies = []
+  const seen = new Set()
+  for (const c of allClients) {
+    const key = (c.company || '').toLowerCase().trim()
+    if (!seen.has(key)) { seen.add(key); uniqueCompanies.push(c) }
+  }
+
+  const filtered = companySearch.trim()
+    ? uniqueCompanies.filter(c => c.company?.toLowerCase().includes(companySearch.toLowerCase()))
+    : uniqueCompanies
+
+  const selectClient = (c) => {
+    setSelectedClientId(c.id)
+    setCompany(c.company || '')
+    setCompanySearch(c.company || '')
+    setClientName(c.client_name || '')
+    setClientEmail(c.email || '')
+    setShowDropdown(false)
   }
 
   const handleContactChange = (val) => {
@@ -75,15 +95,27 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
             <input type="text" value={proposalName} onChange={e => setProposalName(e.target.value)} className={inputCls} />
           </div>
 
-          {/* Client picker */}
-          <div>
+          {/* Searchable company picker */}
+          <div className="relative" ref={dropdownRef}>
             <label className="text-fp-muted text-xs mb-1 block">Company</label>
-            <select value={selectedClientId} onChange={e => handleClientChange(e.target.value)} className={inputCls}>
-              <option value="">— Select company —</option>
-              {allClients.map(c => (
-                <option key={c.id} value={c.id}>{c.company}{c.client_name ? ` — ${c.client_name}` : ''}</option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value={companySearch}
+              onChange={e => { setCompanySearch(e.target.value); setShowDropdown(true); if (!e.target.value) { setSelectedClientId(''); setCompany('') } }}
+              onFocus={() => setShowDropdown(true)}
+              placeholder="Search companies…"
+              className={inputCls}
+            />
+            {showDropdown && filtered.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-fp-card border border-fp-border rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                {filtered.map(c => (
+                  <button key={c.id} onMouseDown={() => selectClient(c)}
+                    className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                    {c.company}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Location picker */}
@@ -115,7 +147,7 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
             </div>
           )}
 
-          {/* Manual overrides */}
+          {/* Contact name / email overrides */}
           {selectedClientId && (
             <div className="grid grid-cols-2 gap-3 pt-1 border-t border-fp-border">
               <div>
@@ -129,7 +161,7 @@ export default function DuplicateProposalModal({ proposal, orgId, onDuplicate, o
             </div>
           )}
 
-          <p className="text-fp-muted text-xs">All line items, sections, and labor will be copied. Status resets to Draft.</p>
+          <p className="text-fp-muted text-xs">All line items, sections, and labor will be copied. A new quote number will be assigned.</p>
         </div>
 
         <div className="flex gap-3 mt-6">

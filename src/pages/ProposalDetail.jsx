@@ -2893,6 +2893,14 @@ export default function ProposalDetail({ isAdmin }) {
     try {
       const { id: _id, created_at, archived_at, signing_token, signature_name, signature_at, signed_pdf_url,
               quote_number, contract_number, qbo_invoice_id, revision_number, original_proposal_id, is_current_revision, ...fields } = proposal
+      // Generate a new quote number
+      let quoteNumber = ''
+      const { data: orgData } = await supabase.from('organizations').select('quote_counter').eq('id', profile.org_id).single()
+      if (orgData) {
+        quoteNumber = `Q-${orgData.quote_counter}`
+        await supabase.from('organizations').update({ quote_counter: orgData.quote_counter + 1 }).eq('id', profile.org_id)
+      }
+
       const { data: newProposal, error } = await supabase
         .from('proposals')
         .insert({
@@ -2903,6 +2911,7 @@ export default function ProposalDetail({ isAdmin }) {
           client_email:  form.clientEmail,
           client_id:     form.clientId   || null,
           location_id:   form.locationId || null,
+          quote_number:  quoteNumber || null,
           status:        'Draft',
           pipeline_stage_id: null,
           revision_number: 1,
