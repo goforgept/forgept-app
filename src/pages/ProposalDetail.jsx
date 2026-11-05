@@ -2647,9 +2647,9 @@ export default function ProposalDetail({ isAdmin }) {
         locationIdMap[l.id] = l.id
       }
     }
-    // Delete removed locations
+    // Delete removed locations (keep all IDs we just inserted or updated)
     const { data: existingLocs } = await supabase.from('proposal_locations').select('id').eq('proposal_id', id)
-    const keepLocIds = new Set(proposalLocations.filter(l => !l.isNew).map(l => l.id))
+    const keepLocIds = new Set(Object.values(locationIdMap))
     for (const { id: lid } of (existingLocs || [])) {
       if (!keepLocIds.has(lid)) await supabase.from('proposal_locations').delete().eq('id', lid)
     }
