@@ -3734,19 +3734,20 @@ const analyzeDrawing = async () => {
             const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
             const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
             const locTotal = locMat + locLab
-            // Location header — two-line bar: name + full address
+            // Location header — large text, no background fill
             const locAddrParts = [loc.address, loc.city, loc.state].filter(Boolean)
-            const locHdrHeight = locAddrParts.length > 0 ? 16 : 10
             if (yPos + 50 > pageHeight - 20) { doc.addPage(); yPos = 20 }
-            doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-            doc.rect(14, yPos, pageWidth - 28, locHdrHeight, 'F')
-            doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
-            doc.text(loc.name || 'Unnamed Location', 17, yPos + 7)
+            doc.setFontSize(14); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.text(loc.name || 'Unnamed Location', 14, yPos + 6)
+            yPos += 9
             if (locAddrParts.length > 0) {
-              doc.setFontSize(8); doc.setFont(pdfFont, 'normal')
-              doc.text(locAddrParts.join(', '), 17, yPos + 13)
+              doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
+              doc.text(locAddrParts.join(', '), 14, yPos)
+              yPos += 6
             }
-            yPos += locHdrHeight + 2
+            doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.line(14, yPos, pageWidth - 14, yPos)
+            yPos += 5
             for (const section of locSections) renderPdfSection(section)
             if (!isLumpSum) {
               doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
