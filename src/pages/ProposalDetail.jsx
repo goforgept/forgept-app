@@ -1819,9 +1819,10 @@ export default function ProposalDetail({ isAdmin }) {
             const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
             const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
             const locTotal = locMat + locLab
-            const locLabel = [loc.name, loc.city, loc.state].filter(Boolean).join(' · ')
+            const locAddrLine = [loc.address, loc.city, loc.state].filter(Boolean).join(', ')
             children.push(
-              new Paragraph({ children: [new TextRun({ text: locLabel, bold: true, size: 26, color: primaryColor })] }),
+              new Paragraph({ children: [new TextRun({ text: loc.name || 'Unnamed Location', bold: true, size: 26, color: primaryColor })] }),
+              ...(locAddrLine ? [new Paragraph({ children: [new TextRun({ text: locAddrLine, size: 18, color: '666666' })] })] : []),
               new Paragraph({ children: [new TextRun({ text: '' })] }),
             )
             for (const section of locSections) renderDocxSection(section)
@@ -3733,17 +3734,19 @@ const analyzeDrawing = async () => {
             const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
             const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
             const locTotal = locMat + locLab
-            // Location header — wider/taller than section header
+            // Location header — two-line bar: name + full address
+            const locAddrParts = [loc.address, loc.city, loc.state].filter(Boolean)
+            const locHdrHeight = locAddrParts.length > 0 ? 16 : 10
             if (yPos + 50 > pageHeight - 20) { doc.addPage(); yPos = 20 }
             doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-            doc.rect(14, yPos, pageWidth - 28, 10, 'F')
+            doc.rect(14, yPos, pageWidth - 28, locHdrHeight, 'F')
             doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
             doc.text(loc.name || 'Unnamed Location', 17, yPos + 7)
-            if (loc.city || loc.state) {
+            if (locAddrParts.length > 0) {
               doc.setFontSize(8); doc.setFont(pdfFont, 'normal')
-              doc.text([loc.city, loc.state].filter(Boolean).join(', '), pageWidth - 14, yPos + 7, { align: 'right' })
+              doc.text(locAddrParts.join(', '), 17, yPos + 13)
             }
-            yPos += 12
+            yPos += locHdrHeight + 2
             for (const section of locSections) renderPdfSection(section)
             if (!isLumpSum) {
               doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
