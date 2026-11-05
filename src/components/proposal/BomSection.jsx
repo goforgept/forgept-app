@@ -63,6 +63,10 @@ export default function BomSection({
   onSaveLinePrice,
   onSaveLaborPrice,
   onAddToLibrary,
+  proposalLocations = [],
+  onAddProposalLocation,
+  onUpdateProposalLocation,
+  onDeleteProposalLocation,
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -641,7 +645,71 @@ export default function BomSection({
                     </div>
                   )}
 
-                  {sections.map(section => {
+                  {proposalLocations.length > 0 && (() => {
+                    // Group sections by location
+                    const renderSection = (section) => {
+                      const secItems = lineItems.filter(l => l.section_id === section.id)
+                      if (secItems.length === 0 && (!section.labor_items || section.labor_items.length === 0)) return null
+                      const secMat = secItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
+                      const secLab = section.include_labor ? (section.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0) : 0
+                      const secTotal = secMat + secLab
+                      return (
+                        <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 bg-fp-inset border-b border-fp-border">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-5 rounded-full bg-[#C8622A]" />
+                              <span className="text-fp-text font-semibold text-sm">{section.name || 'Untitled Section'}</span>
+                            </div>
+                            <span className="text-fp-muted text-xs">Section Total: <span className="text-fp-text font-bold">${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
+                          </div>
+                          <div className="p-4">
+                            {secItems.length > 0 && <ViewTable items={secItems} />}
+                            {section.include_labor && (section.labor_items || []).filter(l => l.role).length > 0 && (
+                              <div className="mt-4 pt-4 border-t border-fp-border">
+                                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
+                                <table className="w-full text-sm">
+                                  <thead><tr className="border-b border-fp-border">{['Role','Qty','Unit','Total'].map(h => <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">{h}</th>)}</tr></thead>
+                                  <tbody>{(section.labor_items || []).filter(l => l.role).map((l, i) => <tr key={i} className="border-b border-fp-border/30"><td className="text-fp-text py-2 pr-4">{l.role}</td><td className="text-fp-muted py-2 pr-4">{l.quantity}</td><td className="text-fp-muted py-2 pr-4">{l.unit || 'hr'}</td><td className="text-fp-text py-2 pr-4">${fmt(parseFloat(l.customer_price) || 0)}</td></tr>)}</tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
+                      <>
+                        {proposalLocations.map(loc => {
+                          const locSections = sections.filter(s => s.proposal_location_id === loc.id)
+                          if (locSections.length === 0) return null
+                          const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
+                          const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+                          const locTotal = locMat + locLab
+                          return (
+                            <div key={loc.id} className="border border-fp-border rounded-xl overflow-hidden">
+                              <div className="flex items-center justify-between px-4 py-3 bg-fp-inset/60 border-b border-fp-border">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-fp-brand font-bold text-sm">{loc.name || 'Unnamed Location'}</span>
+                                  {(loc.city || loc.state) && <span className="text-fp-muted text-xs">{[loc.city, loc.state].filter(Boolean).join(', ')}</span>}
+                                </div>
+                                <span className="text-fp-muted text-xs">Location Total: <span className="text-fp-text font-bold">${locTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
+                              </div>
+                              <div className="p-3 space-y-3">
+                                {locSections.map(renderSection)}
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {sections.filter(s => !s.proposal_location_id).map(section => {
+                          const secItems = lineItems.filter(l => l.section_id === section.id)
+                          if (secItems.length === 0 && (!section.labor_items || section.labor_items.length === 0)) return null
+                          return renderSection(section)
+                        })}
+                      </>
+                    )
+                  })()}
+
+                  {proposalLocations.length === 0 && sections.map(section => {
                     const secItems = lineItems.filter(l => l.section_id === section.id)
                     if (secItems.length === 0 && (!section.labor_items || section.labor_items.length === 0)) return null
                     const secMat = secItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
@@ -773,12 +841,63 @@ export default function BomSection({
             <p className="text-fp-muted text-xs">
               {editSections.length > 0 ? `${editSections.length} section${editSections.length !== 1 ? 's' : ''} — items without a section appear in General` : 'No sections — add a section to group items by area or system'}
             </p>
-            {canEdit && (
-              <button onClick={onAddSection} className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
-                + Add Section
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {canEdit && (
+                <button onClick={onAddProposalLocation} className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
+                  + Add Location
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={onAddSection} className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
+                  + Add Section
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Locations Panel */}
+          {canEdit && proposalLocations.length > 0 && (
+            <div className="border border-fp-border rounded-xl overflow-hidden mb-4">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-fp-inset border-b border-fp-border">
+                <span className="text-fp-text text-xs font-semibold uppercase tracking-wide">Locations</span>
+              </div>
+              <div className="divide-y divide-fp-border">
+                {proposalLocations.map(loc => (
+                  <div key={loc.id} className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                    <input
+                      type="text"
+                      value={loc.name}
+                      onChange={e => onUpdateProposalLocation(loc.id, 'name', e.target.value)}
+                      placeholder="Location name (e.g. Site A, Building 1)"
+                      className="flex-1 min-w-[140px] bg-transparent text-fp-text text-sm font-medium focus:outline-none placeholder-fp-muted"
+                    />
+                    <input
+                      type="text"
+                      value={loc.address || ''}
+                      onChange={e => onUpdateProposalLocation(loc.id, 'address', e.target.value)}
+                      placeholder="Address"
+                      className="w-36 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
+                    />
+                    <input
+                      type="text"
+                      value={loc.city || ''}
+                      onChange={e => onUpdateProposalLocation(loc.id, 'city', e.target.value)}
+                      placeholder="City"
+                      className="w-24 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
+                    />
+                    <input
+                      type="text"
+                      value={loc.state || ''}
+                      onChange={e => onUpdateProposalLocation(loc.id, 'state', e.target.value)}
+                      placeholder="ST"
+                      className="w-14 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
+                    />
+                    <button onClick={() => onDeleteProposalLocation(loc.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors ml-auto">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Bulk Edit Bar */}
           <div className="flex items-center gap-2 mb-4 p-3 bg-fp-inset rounded-lg border border-fp-border flex-wrap">
@@ -1135,11 +1254,22 @@ export default function BomSection({
 
                 {editSections.map(section => (
                   <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border flex-wrap">
                       <div className="w-1.5 h-6 rounded-full bg-[#C8622A] flex-shrink-0" />
                       <input type="text" value={section.name} onChange={e => onUpdateSection(section.id, 'name', e.target.value)}
                         placeholder="Section name (e.g. Floor 1, Server Room)"
-                        className="flex-1 bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
+                        className="flex-1 min-w-[120px] bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
+                      {proposalLocations.length > 0 && (
+                        <select
+                          value={section.proposal_location_id || ''}
+                          onChange={e => onUpdateSection(section.id, 'proposal_location_id', e.target.value || null)}
+                          className="bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                          <option value="">— No location —</option>
+                          {proposalLocations.map(l => (
+                            <option key={l.id} value={l.id}>{l.name || 'Unnamed Location'}</option>
+                          ))}
+                        </select>
+                      )}
                       <label className="flex items-center gap-2 cursor-pointer">
                         <span className="text-fp-muted text-xs">Include Labor</span>
                         <button onClick={() => onUpdateSection(section.id, 'include_labor', !section.include_labor)}

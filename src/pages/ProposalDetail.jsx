@@ -172,6 +172,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null)
   const [pdfPreviewGenerating, setPdfPreviewGenerating] = useState(false)
   const [editSections, setEditSections] = useState([])
+  const [proposalLocations, setProposalLocations] = useState([])
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveLineIndex, setMoveLineIndex] = useState(null)
   const [moveType, setMoveType] = useState('move') // 'move' or 'copy'
@@ -220,6 +221,7 @@ export default function ProposalDetail({ isAdmin }) {
     fetchProposal()
     fetchLineItems()
     fetchSections()
+    fetchProposalLocations()
     fetchDrawingSheets()
     fetchRFQRequests()
     fetchPhotos()
@@ -430,6 +432,15 @@ export default function ProposalDetail({ isAdmin }) {
       .eq('proposal_id', id)
       .order('sort_order', { ascending: true })
     setSections(data || [])
+  }
+
+  const fetchProposalLocations = async () => {
+    const { data } = await supabase
+      .from('proposal_locations')
+      .select('*')
+      .eq('proposal_id', id)
+      .order('sort_order', { ascending: true })
+    setProposalLocations(data || [])
   }
 
   const fetchDrawingSheets = async () => {
@@ -2267,6 +2278,7 @@ export default function ProposalDetail({ isAdmin }) {
   const startEditing = () => {
     setEditLines(lineItems.map(l => ({ ...l })))
     setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
+    setProposalLocations(proposalLocations.map(l => ({ ...l })))
     setEditingBOM(true)
   }
 
@@ -2367,6 +2379,30 @@ export default function ProposalDetail({ isAdmin }) {
     // Move all lines from this section to general (null section_id)
     setEditLines(prev => prev.map(l => l.section_id === sectionId ? { ...l, section_id: null } : l))
     setEditSections(prev => prev.filter(s => s.id !== sectionId))
+  }
+
+  const addProposalLocation = () => {
+    setProposalLocations(prev => [...prev, {
+      id: `new_${Date.now()}`,
+      proposal_id: id,
+      org_id: profile?.org_id,
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      sort_order: prev.length,
+      isNew: true,
+    }])
+  }
+
+  const updateProposalLocation = (locId, field, value) => {
+    setProposalLocations(prev => prev.map(l => l.id === locId ? { ...l, [field]: value } : l))
+  }
+
+  const deleteProposalLocation = (locId) => {
+    // Unlink sections from this location
+    setEditSections(prev => prev.map(s => s.proposal_location_id === locId ? { ...s, proposal_location_id: null } : s))
+    setProposalLocations(prev => prev.filter(l => l.id !== locId))
   }
 
   const moveLineToSection = (lineIndex, targetSectionId, type = 'move') => {
@@ -2594,20 +2630,47 @@ export default function ProposalDetail({ isAdmin }) {
   const saveBOM = async () => {
     setSaving(true)
 
+    // Save/update proposal locations first so we have real IDs for section references
+    const locationIdMap = {}
+    for (const l of proposalLocations) {
+      if (l.isNew) {
+        const { data: newLoc, error: locErr } = await supabase.from('proposal_locations').insert({
+          proposal_id: id, org_id: profile?.org_id, name: l.name || 'Untitled Location',
+          address: l.address || null, city: l.city || null, state: l.state || null, sort_order: l.sort_order,
+        }).select().single()
+        if (locErr) { alert('Error saving location: ' + locErr.message); setSaving(false); return }
+        if (newLoc) locationIdMap[l.id] = newLoc.id
+      } else {
+        await supabase.from('proposal_locations').update({
+          name: l.name, address: l.address || null, city: l.city || null, state: l.state || null, sort_order: l.sort_order,
+        }).eq('id', l.id)
+        locationIdMap[l.id] = l.id
+      }
+    }
+    // Delete removed locations
+    const { data: existingLocs } = await supabase.from('proposal_locations').select('id').eq('proposal_id', id)
+    const keepLocIds = new Set(proposalLocations.filter(l => !l.isNew).map(l => l.id))
+    for (const { id: lid } of (existingLocs || [])) {
+      if (!keepLocIds.has(lid)) await supabase.from('proposal_locations').delete().eq('id', lid)
+    }
+
     // Save/update sections first so we have real IDs
     const sectionIdMap = {} // maps temp 'new_xxx' ids to real db ids
     for (const s of editSections) {
+      const resolvedLocId = s.proposal_location_id ? (locationIdMap[s.proposal_location_id] ?? s.proposal_location_id) : null
       if (s.isNew) {
         const { data: newSec, error: secInsertErr } = await supabase.from('proposal_sections').insert({
           proposal_id: id, org_id: profile?.org_id, name: s.name || 'Untitled Section',
-          sort_order: s.sort_order, include_labor: s.include_labor, labor_items: s.labor_items || []
+          sort_order: s.sort_order, include_labor: s.include_labor, labor_items: s.labor_items || [],
+          proposal_location_id: resolvedLocId,
         }).select().single()
         if (secInsertErr) { alert('Error saving section: ' + secInsertErr.message); setSaving(false); return }
         if (newSec) sectionIdMap[s.id] = newSec.id
       } else {
         const { error: secUpdateErr } = await supabase.from('proposal_sections').update({
           name: s.name, sort_order: s.sort_order,
-          include_labor: s.include_labor, labor_items: s.labor_items || []
+          include_labor: s.include_labor, labor_items: s.labor_items || [],
+          proposal_location_id: resolvedLocId,
         }).eq('id', s.id)
         if (secUpdateErr) { alert('Error updating section: ' + secUpdateErr.message); setSaving(false); return }
         sectionIdMap[s.id] = s.id
@@ -2684,6 +2747,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     await fetchLineItems()
     await fetchSections()
+    await fetchProposalLocations()
     await fetchProposal()
     logActivity(`BOM updated — ${validLines.length} line items`)
     setBulkSelectedLines(new Set())
@@ -4120,6 +4184,10 @@ const analyzeDrawing = async () => {
           canEdit={canEdit}
           onSaveLinePrice={saveLinePrice}
           onSaveLaborPrice={saveLaborPrice}
+          proposalLocations={proposalLocations}
+          onAddProposalLocation={addProposalLocation}
+          onUpdateProposalLocation={updateProposalLocation}
+          onDeleteProposalLocation={deleteProposalLocation}
         />}
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />
