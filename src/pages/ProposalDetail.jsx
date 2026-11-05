@@ -2657,7 +2657,7 @@ export default function ProposalDetail({ isAdmin }) {
     // Save/update sections first so we have real IDs
     const sectionIdMap = {} // maps temp 'new_xxx' ids to real db ids
     for (const s of editSections) {
-      const resolvedLocId = s.proposal_location_id ? (locationIdMap[s.proposal_location_id] ?? s.proposal_location_id) : null
+      const resolvedLocId = s.proposal_location_id ? (locationIdMap[s.proposal_location_id] ?? null) : null
       if (s.isNew) {
         const { data: newSec, error: secInsertErr } = await supabase.from('proposal_sections').insert({
           proposal_id: id, org_id: profile?.org_id, name: s.name || 'Untitled Section',
