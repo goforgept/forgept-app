@@ -1252,8 +1252,9 @@ export default function BomSection({
                   {BOMTable({ sectionId: "general", sectionLabel: null })}
                 </div>
 
-                {editSections.map(section => (
-                  <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
+                {proposalLocations.length > 0 && (() => {
+                  const renderEditSection = (section) => (
+                    <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
                     <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border flex-wrap">
                       <div className="w-1.5 h-6 rounded-full bg-[#C8622A] flex-shrink-0" />
                       <input type="text" value={section.name} onChange={e => onUpdateSection(section.id, 'name', e.target.value)}
@@ -1381,6 +1382,62 @@ export default function BomSection({
                           </div>
                         )
                       })()}
+                    </div>
+                  </div>
+                  )
+
+                  // Grouped render (locations exist)
+                  return (
+                    <>
+                      {proposalLocations.map(loc => {
+                        const locSections = editSections.filter(s => s.proposal_location_id === loc.id)
+                        return (
+                          <div key={loc.id} className="border border-fp-border rounded-xl overflow-hidden">
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-fp-inset/60 border-b border-fp-border">
+                              <span className="text-fp-brand font-bold text-sm">{loc.name || 'Unnamed Location'}</span>
+                              {(loc.city || loc.state) && <span className="text-fp-muted text-xs">{[loc.city, loc.state].filter(Boolean).join(', ')}</span>}
+                              <span className="text-fp-muted text-xs ml-auto">{locSections.length} section{locSections.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="p-3 space-y-3">
+                              {locSections.length === 0
+                                ? <p className="text-fp-muted text-xs py-2 text-center">No sections tagged to this location yet</p>
+                                : locSections.map(renderEditSection)}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {editSections.filter(s => !s.proposal_location_id).length > 0 && (
+                        <div className="border border-dashed border-fp-border rounded-xl overflow-hidden">
+                          <div className="px-4 py-2 bg-fp-inset/30 border-b border-fp-border">
+                            <span className="text-fp-muted text-xs font-semibold uppercase tracking-wide">No Location</span>
+                          </div>
+                          <div className="p-3 space-y-3">
+                            {editSections.filter(s => !s.proposal_location_id).map(renderEditSection)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+
+                {proposalLocations.length === 0 && editSections.map(section => (
+                  <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border">
+                      <div className="w-1.5 h-6 rounded-full bg-[#C8622A] flex-shrink-0" />
+                      <input type="text" value={section.name} onChange={e => onUpdateSection(section.id, 'name', e.target.value)}
+                        placeholder="Section name (e.g. Floor 1, Server Room)"
+                        className="flex-1 bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <span className="text-fp-muted text-xs">Include Labor</span>
+                        <button onClick={() => onUpdateSection(section.id, 'include_labor', !section.include_labor)}
+                          className={`w-9 h-5 rounded-full transition-colors relative ${section.include_labor ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${section.include_labor ? 'left-4' : 'left-0.5'}`} />
+                        </button>
+                      </label>
+                      <button onClick={() => onDeleteSection(section.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors ml-2">✕ Remove</button>
+                    </div>
+                    <div className="p-4">
+                      {BOMTable({ sectionId: section.id, sectionLabel: section.name || 'this section' })}
                     </div>
                   </div>
                 ))}
