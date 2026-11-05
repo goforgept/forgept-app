@@ -2424,6 +2424,46 @@ export default function ProposalDetail({ isAdmin }) {
     setProposalLocations(prev => prev.filter(l => l.id !== locId))
   }
 
+  const duplicateSection = (sectionId) => {
+    const src = editSections.find(s => s.id === sectionId)
+    if (!src) return
+    const newId = `new_${Date.now()}`
+    const newSection = { ...src, id: newId, name: `${src.name || 'Section'} (Copy)`, isNew: true }
+    const newLines = editLines
+      .filter(l => l.section_id === sectionId)
+      .map(l => ({ ...l, id: undefined, section_id: newId }))
+    setEditSections(prev => {
+      const idx = prev.findIndex(s => s.id === sectionId)
+      const next = [...prev]
+      next.splice(idx + 1, 0, newSection)
+      return next
+    })
+    setEditLines(prev => [...prev, ...newLines])
+  }
+
+  const copyLocation = (locId) => {
+    const loc = proposalLocations.find(l => l.id === locId)
+    if (!loc) return
+    const newLocId = `new_${Date.now()}`
+    const newLoc = { ...loc, id: newLocId, name: `${loc.name || 'Location'} (Copy)`, isNew: true }
+    const srcSections = editSections.filter(s => s.proposal_location_id === locId)
+    const newSections = []
+    const newLines = []
+    srcSections.forEach((src, i) => {
+      const newSecId = `new_${Date.now()}_${i}`
+      newSections.push({ ...src, id: newSecId, name: src.name || 'Section', isNew: true, proposal_location_id: newLocId })
+      editLines.filter(l => l.section_id === src.id).forEach(l => newLines.push({ ...l, id: undefined, section_id: newSecId }))
+    })
+    setProposalLocations(prev => {
+      const idx = prev.findIndex(l => l.id === locId)
+      const next = [...prev]
+      next.splice(idx + 1, 0, newLoc)
+      return next
+    })
+    setEditSections(prev => [...prev, ...newSections])
+    setEditLines(prev => [...prev, ...newLines])
+  }
+
   const moveLineToSection = (lineIndex, targetSectionId, type = 'move') => {
     if (type === 'copy') {
       const lineCopy = { ...editLines[lineIndex], id: undefined, section_id: targetSectionId === 'general' ? null : targetSectionId }
@@ -3005,12 +3045,23 @@ export default function ProposalDetail({ isAdmin }) {
         .select().single()
       if (error || !newProposal) throw error || new Error('Failed to create duplicate')
 
+      // Copy locations first so sections can reference their new IDs
+      const { data: locs } = await supabase.from('proposal_locations').select('*').eq('proposal_id', id)
+      const locationIdMap = {}
+      if (locs?.length) {
+        for (const { id: oldLocId, ...loc } of locs) {
+          const { data: nl } = await supabase.from('proposal_locations').insert({ ...loc, proposal_id: newProposal.id }).select().single()
+          if (nl) locationIdMap[oldLocId] = nl.id
+        }
+      }
+
       // Copy sections with ID remapping so line items stay linked correctly
       const { data: sects } = await supabase.from('proposal_sections').select('*').eq('proposal_id', id)
       const sectionIdMap = {}
       if (sects?.length) {
         for (const { id: oldId, ...s } of sects) {
-          const { data: ns } = await supabase.from('proposal_sections').insert({ ...s, proposal_id: newProposal.id }).select().single()
+          const resolvedLocId = s.proposal_location_id ? (locationIdMap[s.proposal_location_id] ?? null) : null
+          const { data: ns } = await supabase.from('proposal_sections').insert({ ...s, proposal_id: newProposal.id, proposal_location_id: resolvedLocId }).select().single()
           if (ns) sectionIdMap[oldId] = ns.id
         }
       }
@@ -4243,6 +4294,8 @@ const analyzeDrawing = async () => {
           onAddProposalLocation={addProposalLocation}
           onUpdateProposalLocation={updateProposalLocation}
           onDeleteProposalLocation={deleteProposalLocation}
+          onDuplicateSection={duplicateSection}
+          onCopyLocation={copyLocation}
         />}
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />

@@ -67,6 +67,8 @@ export default function BomSection({
   onAddProposalLocation,
   onUpdateProposalLocation,
   onDeleteProposalLocation,
+  onDuplicateSection,
+  onCopyLocation,
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -1278,7 +1280,8 @@ export default function BomSection({
                           <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${section.include_labor ? 'left-4' : 'left-0.5'}`} />
                         </button>
                       </label>
-                      <button onClick={() => onDeleteSection(section.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors ml-2">✕ Remove</button>
+                      <button onClick={() => onDuplicateSection(section.id)} className="text-fp-muted hover:text-fp-brand text-xs transition-colors">⧉ Duplicate</button>
+                      <button onClick={() => onDeleteSection(section.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕ Remove</button>
                     </div>
                     <div className="p-4">
                       {BOMTable({ sectionId: section.id, sectionLabel: section.name || 'this section' })}
@@ -1397,6 +1400,7 @@ export default function BomSection({
                               <span className="text-fp-brand font-bold text-sm">{loc.name || 'Unnamed Location'}</span>
                               {(loc.city || loc.state) && <span className="text-fp-muted text-xs">{[loc.city, loc.state].filter(Boolean).join(', ')}</span>}
                               <span className="text-fp-muted text-xs ml-auto">{locSections.length} section{locSections.length !== 1 ? 's' : ''}</span>
+                              <button onClick={() => onCopyLocation(loc.id)} className="text-fp-muted hover:text-fp-brand text-xs transition-colors">⧉ Copy Location</button>
                             </div>
                             <div className="p-3 space-y-3">
                               {locSections.length === 0
@@ -1434,7 +1438,8 @@ export default function BomSection({
                           <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${section.include_labor ? 'left-4' : 'left-0.5'}`} />
                         </button>
                       </label>
-                      <button onClick={() => onDeleteSection(section.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors ml-2">✕ Remove</button>
+                      <button onClick={() => onDuplicateSection(section.id)} className="text-fp-muted hover:text-fp-brand text-xs transition-colors">⧉ Duplicate</button>
+                      <button onClick={() => onDeleteSection(section.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕ Remove</button>
                     </div>
                     <div className="p-4">
                       {BOMTable({ sectionId: section.id, sectionLabel: section.name || 'this section' })}
