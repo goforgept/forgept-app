@@ -1756,16 +1756,13 @@ export default function ProposalDetail({ isAdmin }) {
           )
         }
 
-        // Each section
-        for (const section of sections) {
+        const renderDocxSection = (section) => {
           const secItems = lineItems.filter(l => l.section_id === section.id)
           const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
-          if (secItems.length === 0 && secLabor.length === 0) continue
+          if (secItems.length === 0 && secLabor.length === 0) return
           const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
           const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
           const secTotal = secMatTotal + secLaborTotal
-
-          // Section header row spanning full width
           const secHeaderRow = new TableRow({
             children: [new TableCell({
               columnSpan: isLumpSum ? 3 : 5,
@@ -1775,7 +1772,6 @@ export default function ProposalDetail({ isAdmin }) {
               children: [new Paragraph({ children: [new TextRun({ text: section.name || 'Untitled Section', bold: true, color: 'FFFFFF', size: 20 })] })]
             })]
           })
-
           const secItemRows = secItems.map(item =>
             new TableRow({
               children: (isLumpSum
@@ -1784,13 +1780,10 @@ export default function ProposalDetail({ isAdmin }) {
               ).map((val, i) => new TableCell({ borders, width: { size: colWidths[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
             })
           )
-
           children.push(
             new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [secHeaderRow, headerRow, ...secItemRows] }),
             new Paragraph({ children: [new TextRun({ text: '' })] }),
           )
-
-          // Section labor
           if (secLabor.length > 0 && !p?.lump_sum_labor) {
             const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
             const lbs = { top: lb, bottom: lb, left: lb, right: lb }
@@ -1817,6 +1810,31 @@ export default function ProposalDetail({ isAdmin }) {
               new Paragraph({ children: [new TextRun({ text: '' })] }),
             )
           }
+        }
+
+        if (proposalLocations.length > 0) {
+          for (const loc of proposalLocations) {
+            const locSections = sections.filter(s => s.proposal_location_id === loc.id)
+            if (locSections.length === 0) continue
+            const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
+            const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+            const locTotal = locMat + locLab
+            const locLabel = [loc.name, loc.city, loc.state].filter(Boolean).join(' · ')
+            children.push(
+              new Paragraph({ children: [new TextRun({ text: locLabel, bold: true, size: 26, color: primaryColor })] }),
+              new Paragraph({ children: [new TextRun({ text: '' })] }),
+            )
+            for (const section of locSections) renderDocxSection(section)
+            if (!isLumpSum) {
+              children.push(
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${loc.name || 'Location'} Total: $${locTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 20, color: primaryColor })] }),
+                new Paragraph({ children: [new TextRun({ text: '' })] }),
+              )
+            }
+          }
+          for (const section of sections.filter(s => !s.proposal_location_id)) renderDocxSection(section)
+        } else {
+          for (const section of sections) renderDocxSection(section)
         }
 
       } else {
@@ -3649,6 +3667,49 @@ const analyzeDrawing = async () => {
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
       const tableStyles = { theme: freshPdfStriped ? 'striped' : 'plain', headStyles: { fillColor: hdrFill, textColor: hdrText }, footStyles: { fillColor: hdrFill, textColor: hdrText, fontStyle: 'bold' }, alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
+      const renderPdfSection = (section) => {
+        const secItems = lineItems.filter(l => l.section_id === section.id)
+        const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+        if (secItems.length === 0 && secLabor.length === 0) return
+        const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+        const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+        const secTotal = secMatTotal + secLaborTotal
+        if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
+        doc.setFillColor(hdrFill[0], hdrFill[1], hdrFill[2])
+        doc.rect(14, yPos, pageWidth - 28, 8, 'F')
+        doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(hdrText[0], hdrText[1], hdrText[2])
+        doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
+        yPos += 10
+        if (secItems.length > 0) {
+          autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
+          yPos = doc.lastAutoTable.finalY + 4
+        }
+        if (secLabor.length > 0) {
+          if (p?.lump_sum_labor) {
+            const secLaborAmt = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+            doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(80, 80, 80)
+            doc.text('Labor', 17, yPos + 4)
+            doc.setFont(pdfFont, 'bold'); doc.setTextColor(30, 30, 30)
+            doc.text(`$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
+            yPos += 8
+          } else {
+            doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
+            doc.text('Section Labor', 14, yPos + 4); yPos += 6
+            const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
+            const lRow = (l) => p?.hide_labor_breakdown
+              ? [l.role, l.quantity, l.unit || 'hr']
+              : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+            autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
+            yPos = doc.lastAutoTable.finalY + 4
+          }
+        }
+        if (!isLumpSum) {
+          doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+          yPos += 8
+        }
+      }
+
       if (sections.length > 0) {
         // Unsectioned items first
         const unsectioned = lineItems.filter(l => !l.section_id)
@@ -3663,50 +3724,40 @@ const analyzeDrawing = async () => {
           autoTable(doc, { startY: yPos, head: pdfHead, body: unsectioned.map(pdfRow), ...(isLumpSum ? {} : { foot: pdfFoot(unsecTotal) }), ...tableStyles })
           yPos = doc.lastAutoTable.finalY + 8
         }
-        // Each section
-        for (const section of sections) {
-          const secItems = lineItems.filter(l => l.section_id === section.id)
-          const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
-          if (secItems.length === 0 && secLabor.length === 0) continue
-          const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
-          const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-          const secTotal = secMatTotal + secLaborTotal
-          // Section header bar — ensure enough room for the bar + at least a few rows
-          if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
-          doc.setFillColor(hdrFill[0], hdrFill[1], hdrFill[2])
-          doc.rect(14, yPos, pageWidth - 28, 8, 'F')
-          doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(hdrText[0], hdrText[1], hdrText[2])
-          doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
-          yPos += 10
-          if (secItems.length > 0) {
-            autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
-            yPos = doc.lastAutoTable.finalY + 4
-          }
-          if (secLabor.length > 0) {
-            if (p?.lump_sum_labor) {
-              const secLaborAmt = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-              doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(80, 80, 80)
-              doc.text('Labor', 17, yPos + 4)
-              doc.setFont(pdfFont, 'bold'); doc.setTextColor(30, 30, 30)
-              doc.text(`$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
-              yPos += 8
-            } else {
-              doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
-              doc.text('Section Labor', 14, yPos + 4); yPos += 6
-              const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
-              const lRow = (l) => p?.hide_labor_breakdown
-                ? [l.role, l.quantity, l.unit || 'hr']
-                : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
-              autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
-              yPos = doc.lastAutoTable.finalY + 4
+
+        if (proposalLocations.length > 0) {
+          // Grouped by location
+          for (const loc of proposalLocations) {
+            const locSections = sections.filter(s => s.proposal_location_id === loc.id)
+            if (locSections.length === 0) continue
+            const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(l => l.section_id === s.id).reduce((ss, l) => ss + (l.customer_price_total || 0), 0), 0)
+            const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+            const locTotal = locMat + locLab
+            // Location header — wider/taller than section header
+            if (yPos + 50 > pageHeight - 20) { doc.addPage(); yPos = 20 }
+            doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.rect(14, yPos, pageWidth - 28, 10, 'F')
+            doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
+            doc.text(loc.name || 'Unnamed Location', 17, yPos + 7)
+            if (loc.city || loc.state) {
+              doc.setFontSize(8); doc.setFont(pdfFont, 'normal')
+              doc.text([loc.city, loc.state].filter(Boolean).join(', '), pageWidth - 14, yPos + 7, { align: 'right' })
+            }
+            yPos += 12
+            for (const section of locSections) renderPdfSection(section)
+            if (!isLumpSum) {
+              doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+              doc.text(`${loc.name || 'Location'} Total: $${locTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+              doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+              doc.line(pageWidth - 80, yPos + 2, pageWidth - 14, yPos + 2)
+              yPos += 10
             }
           }
-          // Section subtotal line — hidden in installer/lump-sum mode
-          if (!isLumpSum) {
-            doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-            doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-            yPos += 8
-          }
+          // Sections with no location
+          for (const section of sections.filter(s => !s.proposal_location_id)) renderPdfSection(section)
+        } else {
+          // Flat — no locations
+          for (const section of sections) renderPdfSection(section)
         }
       } else {
         // No sections — original flat render
