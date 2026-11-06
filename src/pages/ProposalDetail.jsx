@@ -3564,6 +3564,7 @@ const analyzeDrawing = async () => {
       const refParts = []
       if (proposal?.quote_number) refParts.push(`Quote #: ${proposal.quote_number}`)
       if (proposal?.contract_number) refParts.push(`Contract #: ${proposal.contract_number}`)
+      if (proposal?.quote_expires_at) refParts.push(`Valid Until: ${new Date(proposal.quote_expires_at + 'T00:00:00').toLocaleDateString()}`)
       if (refParts.length > 0) doc.text(refParts.join('    '), 16, ftY + 6)
       if (proposal?.rep_name) {
         doc.setFont(pdfFont, 'bold'); doc.setTextColor(60, 60, 60)
@@ -3607,7 +3608,7 @@ const analyzeDrawing = async () => {
         doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, pdfRefY); pdfRefY += 7
         if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
         if (proposal?.contract_number) { doc.text(`Contract #: ${proposal.contract_number}`, 14, pdfRefY); pdfRefY += 7 }
-        if (proposal?.quote_expires_at) { doc.text(`Valid Until: ${proposal.quote_expires_at}`, 14, pdfRefY); pdfRefY += 7 }
+        if (proposal?.quote_expires_at) { doc.text(`Valid Until: ${new Date(proposal.quote_expires_at + 'T00:00:00').toLocaleDateString()}`, 14, pdfRefY); pdfRefY += 7 }
         const repLines = []
         if (proposal?.rep_name) repLines.push(`Rep: ${proposal.rep_name}`)
         if (proposal?.rep_title) repLines.push(proposal.rep_title)
@@ -3666,7 +3667,7 @@ const analyzeDrawing = async () => {
       pdfRefY += 7
       if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
       if (proposal?.contract_number) { doc.text(`Contract #: ${proposal.contract_number}`, 14, pdfRefY); pdfRefY += 7 }
-      if (proposal?.quote_expires_at) { doc.text(`Valid Until: ${proposal.quote_expires_at}`, 14, pdfRefY); pdfRefY += 7 }
+      if (proposal?.quote_expires_at) { doc.text(`Valid Until: ${new Date(proposal.quote_expires_at + 'T00:00:00').toLocaleDateString()}`, 14, pdfRefY); pdfRefY += 7 }
 
       const repLines = []
       if (proposal?.rep_name) repLines.push(`Rep: ${proposal.rep_name}`)
