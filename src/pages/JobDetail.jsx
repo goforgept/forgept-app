@@ -893,8 +893,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
       doc.text('Labor — Line Item Detail', 20, y + 7); y += 14
       autoTable(doc, {
-        startY: y, head: [['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin %']],
-        body: allLaborForPDF.map(l => { const cp = parseFloat(l.customer_price) || 0; const yc = parseFloat(l.your_cost) || 0; return [l.role || '—', l._sectionName || '—', `${parseFloat(l.quantity) || 0} ${l.unit || 'hr'}`, `$${yc.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${cp.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, cp > 0 ? `${((cp - yc) / cp * 100).toFixed(1)}%` : '—'] }),
+        startY: y, head: [['Role', 'Section', 'Planned Hrs', 'Total Your Cost', 'Total Cust. Price', 'Margin %']],
+        body: allLaborForPDF.map(l => { const qty = parseFloat(l.quantity) || 0; const totalCost = (parseFloat(l.your_cost) || 0) * qty; const totalRev = (parseFloat(l.customer_price) || 0) * qty; return [l.role || '—', l._sectionName || '—', `${qty} ${l.unit || 'hr'}`, `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, totalRev > 0 ? `${((totalRev - totalCost) / totalRev * 100).toFixed(1)}%` : '—'] }),
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
