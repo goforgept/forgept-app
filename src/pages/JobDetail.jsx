@@ -860,17 +860,26 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     y = doc.lastAutoTable.finalY + 10
 
     if (lineItems.length > 0) {
+      const sectionMap = Object.fromEntries((proposalSections || []).map(s => [s.id, s]))
+      const locationMap = Object.fromEntries((proposalLocations || []).map(l => [l.id, l]))
+      const getSectionLabel = (item) => {
+        const sec = sectionMap[item.section_id]
+        if (!sec) return '—'
+        const loc = sec.proposal_location_id ? locationMap[sec.proposal_location_id] : null
+        return loc ? `${loc.name} › ${sec.name}` : sec.name
+      }
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.rect(14, y, 2, 10, 'F')
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
       doc.text('Materials — Line Item Detail', 20, y + 7); y += 14
       autoTable(doc, {
-        startY: y, head: [['Item', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Customer Price', 'Margin']],
+        startY: y, head: [['Item', 'Section', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Cust. Price', 'Margin %']],
         body: lineItems.map(item => {
           const used = usedByItemId[item.id] || 0; const planned = parseFloat(item.quantity) || 0
           const remaining = planned - used; const cost = (item.your_cost_unit || 0) * planned; const revenue = item.customer_price_total || 0
-          return [item.item_name, item.vendor || '—', `${planned} ${item.unit || ''}`, used > 0 ? `${used} ${item.unit || ''}` : '—', used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+          const marginPct = revenue > 0 ? `${((revenue - cost) / revenue * 100).toFixed(1)}%` : '—'
+          return [item.item_name, getSectionLabel(item), item.vendor || '—', `${planned} ${item.unit || ''}`, used > 0 ? `${used} ${item.unit || ''}` : '—', used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, marginPct]
         }),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 7.5 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
