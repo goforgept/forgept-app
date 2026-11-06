@@ -21,6 +21,7 @@ export default function SignProposal() {
   const [slaContracts, setSlaContracts] = useState([])
   const [monitoringContracts, setMonitoringContracts] = useState([])
   const [sections, setSections] = useState([])
+  const [proposalLocations, setProposalLocations] = useState([])
   const [slaAccepted, setSlaAccepted] = useState([])
   const [monitoringAccepted, setMonitoringAccepted] = useState([])
 
@@ -62,6 +63,13 @@ export default function SignProposal() {
       .eq('proposal_id', data.id)
       .order('sort_order', { ascending: true })
     setSections(sectionData || [])
+
+    const { data: locData } = await supabase
+      .from('proposal_locations')
+      .select('*')
+      .eq('proposal_id', data.id)
+      .order('sort_order', { ascending: true })
+    setProposalLocations(locData || [])
 
     if (data.org_id) {
       const [{ data: orgProf }, { data: orgRow }] = await Promise.all([
@@ -156,6 +164,7 @@ export default function SignProposal() {
       const signStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sectionData.length > 0) {
+        const pageHeight = doc.internal.pageSize.getHeight()
         const unsectioned = items.filter(i => !i.section_id)
         if (unsectioned.length > 0) {
           doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
@@ -163,13 +172,15 @@ export default function SignProposal() {
           autoTable(doc, { startY: yPos, head: signHead, body: unsectioned.map(signRow), ...signStyles, showFoot: false })
           yPos = doc.lastAutoTable.finalY + 6
         }
-        for (const section of sectionData) {
+
+        const renderSignSection = (section) => {
           const secItems = items.filter(i => i.section_id === section.id)
           const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
-          if (secItems.length === 0 && secLabor.length === 0) continue
+          if (secItems.length === 0 && secLabor.length === 0) return
           const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
           const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
           const secTotal = secMatTotal + secLaborTotal
+          if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
           doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
           doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
@@ -192,6 +203,38 @@ export default function SignProposal() {
           doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
           yPos += 8
+        }
+
+        if (proposalLocations.length > 0) {
+          for (const loc of proposalLocations) {
+            const locSections = sectionData.filter(s => s.proposal_location_id === loc.id)
+            if (locSections.length === 0) continue
+            const locMat = locSections.reduce((sum, s) => sum + items.filter(i => i.section_id === s.id).reduce((ss, i) => ss + (i.customer_price_total || 0), 0), 0)
+            const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+            const locTotal = locMat + locLab
+            const locAddrParts = [loc.address, loc.city, loc.state].filter(Boolean)
+            if (yPos + 50 > pageHeight - 20) { doc.addPage(); yPos = 20 }
+            doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.text(loc.name || 'Unnamed Location', 14, yPos + 6)
+            yPos += 9
+            if (locAddrParts.length > 0) {
+              doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+              doc.text(locAddrParts.join(', '), 14, yPos)
+              yPos += 6
+            }
+            doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.line(14, yPos, pageWidth - 14, yPos)
+            yPos += 5
+            for (const section of locSections) renderSignSection(section)
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.text(`${loc.name || 'Location'} Total: $${locTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+            doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.line(pageWidth - 80, yPos + 2, pageWidth - 14, yPos + 2)
+            yPos += 10
+          }
+          for (const section of sectionData.filter(s => !s.proposal_location_id)) renderSignSection(section)
+        } else {
+          for (const section of sectionData) renderSignSection(section)
         }
         yPos += 4
       } else {
@@ -598,6 +641,54 @@ export default function SignProposal() {
                 </div>
               ) : null
 
+              const SectionCard = ({ section }) => {
+                const secItems = lineItems.filter(l => l.section_id === section.id)
+                const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+                if (secItems.length === 0 && secLabor.length === 0) return null
+                const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+                const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+                const secTotal = secMatTotal + secLaborTotal
+                return (
+                  <div key={section.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-5 rounded-full bg-[#C8622A]" />
+                        <span className="text-white font-semibold text-sm">{section.name || 'Untitled Section'}</span>
+                      </div>
+                      <span className="text-[#8A9AB0] text-xs">Section Total: <span className="text-white font-bold">${fmt(secTotal)}</span></span>
+                    </div>
+                    <div className="p-4">
+                      {secItems.length > 0 && <ItemTable items={secItems} />}
+                      {secLabor.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#2a3d55]">
+                                <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
+                                <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                                <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
+                                {!proposal?.hide_labor_breakdown && <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {secLabor.map((l, i) => (
+                                <tr key={i} className="border-b border-[#2a3d55]/30">
+                                  <td className="text-white py-2 pr-4">{l.role}</td>
+                                  <td className="text-[#8A9AB0] py-2 pr-4 text-right">{l.quantity}</td>
+                                  <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
+                                  {!proposal?.hide_labor_breakdown && <td className="text-white py-2 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
               if (sections.length > 0) {
                 const unsectioned = lineItems.filter(l => !l.section_id)
                 return (
@@ -608,53 +699,36 @@ export default function SignProposal() {
                         <ItemTable items={unsectioned} />
                       </div>
                     )}
-                    {sections.map(section => {
-                      const secItems = lineItems.filter(l => l.section_id === section.id)
-                      const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
-                      if (secItems.length === 0 && secLabor.length === 0) return null
-                      const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
-                      const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-                      const secTotal = secMatTotal + secLaborTotal
-                      return (
-                        <div key={section.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-5 rounded-full bg-[#C8622A]" />
-                              <span className="text-white font-semibold text-sm">{section.name || 'Untitled Section'}</span>
-                            </div>
-                            <span className="text-[#8A9AB0] text-xs">Section Total: <span className="text-white font-bold">${fmt(secTotal)}</span></span>
-                          </div>
-                          <div className="p-4">
-                            {secItems.length > 0 && <ItemTable items={secItems} />}
-                            {secLabor.length > 0 && (
-                              <div className="mt-4 pt-4 border-t border-[#2a3d55]">
-                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-[#2a3d55]">
-                                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
-                                      <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
-                                      {!proposal?.hide_labor_breakdown && <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {secLabor.map((l, i) => (
-                                      <tr key={i} className="border-b border-[#2a3d55]/30">
-                                        <td className="text-white py-2 pr-4">{l.role}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4 text-right">{l.quantity}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
-                                        {!proposal?.hide_labor_breakdown && <td className="text-white py-2 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                    {proposalLocations.length > 0 ? (
+                      <>
+                        {proposalLocations.map(loc => {
+                          const locSections = sections.filter(s => s.proposal_location_id === loc.id)
+                          if (locSections.length === 0) return null
+                          const locMat = locSections.reduce((sum, s) => sum + lineItems.filter(i => i.section_id === s.id).reduce((ss, i) => ss + (i.customer_price_total || 0), 0), 0)
+                          const locLab = locSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+                          const locTotal = locMat + locLab
+                          const locAddrParts = [loc.address, loc.city, loc.state].filter(Boolean)
+                          return (
+                            <div key={loc.id} className="space-y-3">
+                              <div className="pb-2 border-b-2 border-[#C8622A]">
+                                <h3 className="text-white font-bold text-base">{loc.name || 'Unnamed Location'}</h3>
+                                {locAddrParts.length > 0 && <p className="text-[#8A9AB0] text-xs mt-0.5">{locAddrParts.join(', ')}</p>}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
+                              <div className="space-y-3">
+                                {locSections.map(s => <SectionCard key={s.id} section={s} />)}
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[#8A9AB0] text-sm font-semibold">{loc.name || 'Location'} Total: </span>
+                                <span className="text-white font-bold">${fmt(locTotal)}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {sections.filter(s => !s.proposal_location_id).map(s => <SectionCard key={s.id} section={s} />)}
+                      </>
+                    ) : (
+                      sections.map(section => <SectionCard key={section.id} section={section} />)
+                    )}
                     {generalLaborBlock}
                     <table className="w-full text-sm">
                       <tfoot>

@@ -3,11 +3,22 @@ import { setAIPageContext, clearAIPageContext } from '../../aiPageContext'
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF, laborRates = [], orgProfiles = [], onAddManualEntry }) {
+export default function CostReportTab({ job, proposal, proposalSections = [], proposalLocations = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF, laborRates = [], orgProfiles = [], onAddManualEntry }) {
+  const locationById = Object.fromEntries(proposalLocations.map(l => [l.id, l.name]))
+  const sectionLocationMap = Object.fromEntries(
+    proposalSections.filter(s => s.proposal_location_id).map(s => [s.id, s.proposal_location_id])
+  )
+
   // Merge proposal-level labor with section labor items
   const allLaborItems = [
     ...(proposal?.labor_items || []),
-    ...(proposalSections || []).flatMap(s => (s.labor_items || []).map(l => ({ ...l, _sectionName: s.name }))),
+    ...(proposalSections || []).flatMap(s =>
+      (s.include_labor ? (s.labor_items || []) : []).map(l => ({
+        ...l,
+        _sectionName: s.name,
+        _locationName: s.proposal_location_id ? (locationById[s.proposal_location_id] || null) : null,
+      }))
+    ),
   ]
   const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
   const quotedLabor = allLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
@@ -28,6 +39,21 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(1) : '0.0'
   const overBudget = totalRevenue > 0 && totalCost > totalRevenue
   const nearBudget = !overBudget && totalRevenue > 0 && totalCost / totalRevenue > 0.8
+
+  const locationBreakdown = proposalLocations.map(loc => {
+    const locSections = proposalSections.filter(s => s.proposal_location_id === loc.id)
+    const locSectionIds = new Set(locSections.map(s => s.id))
+    const locItems = lineItems.filter(i => locSectionIds.has(i.section_id))
+    const locMatRev = locItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+    const locMatCost = locItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+    const locLaborItems = locSections.flatMap(s => s.include_labor ? (s.labor_items || []).filter(l => l.role) : [])
+    const locLabRev = locLaborItems.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+    const locLabCost = locLaborItems.reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+    const rev = locMatRev + locLabRev
+    const cost = locMatCost + locLabCost
+    const margin = rev > 0 ? ((rev - cost) / rev * 100).toFixed(1) : null
+    return { ...loc, rev, cost, margin }
+  }).filter(loc => loc.rev > 0 || loc.cost > 0)
 
   const rows = [
     { label: 'Quoted Materials', quoted: quotedMaterials, cost: costMaterials, color: 'text-fp-text' },
@@ -193,25 +219,40 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
         )}
 
         {/* Job Progress */}
-        <div className="bg-fp-inset rounded-xl p-5 space-y-4">
-          <p className="text-fp-text font-semibold text-sm">Job Progress</p>
-          {[
-            { label: 'Materials Used', pct: materialsPct, detail: totalPlannedUnits > 0 ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}` : 'No materials logged', over: materialsOver, color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]' },
-            { label: 'Labor Hours', pct: laborPct, detail: estimatedHours > 0 ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}` : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`, over: laborOver, color: laborOver ? 'bg-red-500' : 'bg-blue-500' },
-            { label: 'Checklist', pct: checklistPct, detail: `${checklistDone} of ${checklistTotal} items complete`, over: false, color: 'bg-green-500' },
-            { label: 'Cost Burned', pct: costBurnPct, detail: totalCost > 0 ? `$${fmt(actualCostTotal)} of $${fmt(totalCost)} budgeted` : 'No cost data', over: actualCostTotal > totalCost, color: actualCostTotal > totalCost ? 'bg-red-500' : 'bg-purple-500' },
-          ].map(({ label, pct, detail, over, color }) => (
-            <div key={label}>
-              <div className="flex justify-between items-baseline mb-1">
-                <span className="text-fp-muted text-xs">{label}</span>
-                <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-fp-text'}`}>{pct.toFixed(0)}%{over ? ' ⚠' : ''}</span>
-              </div>
-              <div className="w-full bg-fp-card rounded-full h-2 mb-1">
-                <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-              </div>
-              <p className={`text-xs ${over ? 'text-red-400' : 'text-fp-muted'}`}>{detail}</p>
-            </div>
-          ))}
+        <div className="bg-fp-inset rounded-xl p-5">
+          <p className="text-fp-text font-semibold text-sm mb-5">Job Progress</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: 'Materials Used', pct: materialsPct, detail: totalPlannedUnits > 0 ? `${totalUsedUnits} of ${totalPlannedUnits} units` : 'No materials logged', over: materialsOver, stroke: materialsOver ? '#ef4444' : '#C8622A' },
+              { label: 'Labor Hours',    pct: laborPct,    detail: estimatedHours > 0 ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs` : `${hoursLogged.toFixed(1)} hrs logged`, over: laborOver, stroke: laborOver ? '#ef4444' : '#3b82f6' },
+              { label: 'Checklist',      pct: checklistPct, detail: `${checklistDone} of ${checklistTotal} items`, over: false, stroke: '#22c55e' },
+              { label: 'Cost Burned',   pct: costBurnPct, detail: totalCost > 0 ? `$${fmt(actualCostTotal)} of $${fmt(totalCost)}` : 'No cost data', over: actualCostTotal > totalCost, stroke: actualCostTotal > totalCost ? '#ef4444' : '#a855f7' },
+            ].map(({ label, pct, detail, over, stroke }) => {
+              const r = 30
+              const circ = 2 * Math.PI * r
+              const filled = Math.min(pct, 100) / 100 * circ
+              return (
+                <div key={label} className="flex flex-col items-center gap-2">
+                  <div className="relative w-20 h-20">
+                    <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90">
+                      <circle cx="36" cy="36" r={r} fill="none" stroke="currentColor" strokeWidth="6" className="text-fp-card" />
+                      <circle cx="36" cy="36" r={r} fill="none" stroke={stroke} strokeWidth="6"
+                        strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+                        style={{ transition: 'stroke-dasharray 0.4s ease' }} />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className={`text-sm font-bold leading-none ${over ? 'text-red-400' : 'text-fp-text'}`}>{Math.round(pct)}%</span>
+                      {over && <span className="text-[9px] text-red-400 leading-none mt-0.5">over</span>}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-fp-text text-xs font-semibold">{label}</p>
+                    <p className={`text-[11px] mt-0.5 ${over ? 'text-red-400' : 'text-fp-muted'}`}>{detail}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* Job Profitability */}
@@ -316,6 +357,43 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
           </table>
         </div>
 
+        {/* By Location breakdown */}
+        {locationBreakdown.length > 0 && (
+          <div>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">By Location</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-fp-border">
+                    <th className="text-fp-muted text-left py-2 font-normal">Location</th>
+                    <th className="text-fp-muted text-right py-2 pr-4 font-normal">Revenue</th>
+                    <th className="text-fp-muted text-right py-2 pr-4 font-normal">Cost</th>
+                    <th className="text-fp-muted text-right py-2 pr-4 font-normal">Margin $</th>
+                    <th className="text-fp-muted text-right py-2 font-normal">Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locationBreakdown.map(loc => {
+                    const profit = loc.rev - loc.cost
+                    return (
+                      <tr key={loc.id} className="border-b border-fp-border/50">
+                        <td className="py-3">
+                          <p className="text-fp-text font-semibold text-sm">{loc.name || 'Unnamed'}</p>
+                          {(loc.city || loc.state) && <p className="text-fp-muted text-xs">{[loc.city, loc.state].filter(Boolean).join(', ')}</p>}
+                        </td>
+                        <td className="text-fp-text py-3 pr-4 text-right">${fmt(loc.rev)}</td>
+                        <td className="text-fp-text py-3 pr-4 text-right">${fmt(loc.cost)}</td>
+                        <td className={`py-3 pr-4 text-right font-semibold ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>{profit >= 0 ? '+' : ''}${fmt(profit)}</td>
+                        <td className={`py-3 text-right font-semibold ${parseFloat(loc.margin) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{loc.margin !== null ? `${loc.margin}%` : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Materials breakdown */}
         {lineItems.length > 0 && (
           <div>
@@ -324,7 +402,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-fp-border">
-                    {['Item', 'Vendor', 'Planned', 'Used', 'Remaining', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
+                    {[...(locationBreakdown.length > 0 ? ['Location'] : []), 'Item', 'Vendor', 'Planned', 'Used', 'Remaining', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
                       <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
@@ -342,6 +420,9 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                     const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
                     return (
                       <tr key={item.id} className="border-b border-fp-border/30">
+                        {locationBreakdown.length > 0 && (
+                          <td className="text-fp-muted py-2 pr-3 text-xs">{item.section_id && sectionLocationMap[item.section_id] ? locationById[sectionLocationMap[item.section_id]] : '—'}</td>
+                        )}
                         <td className="text-fp-text py-2 pr-3 font-medium">{item.item_name}</td>
                         <td className="text-fp-muted py-2 pr-3">{item.vendor || '—'}</td>
                         <td className="text-fp-text py-2 pr-3">{planned} {item.unit}</td>
@@ -362,7 +443,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-fp-border">
-                    <td colSpan="5" className="text-fp-muted pt-2 font-semibold">Totals</td>
+                    <td colSpan={locationBreakdown.length > 0 ? 6 : 5} className="text-fp-muted pt-2 font-semibold">Totals</td>
                     <td className="text-fp-text pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</td>
                     <td className="text-fp-text pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + (i.customer_price_total || 0), 0))}</td>
                     <td className="text-green-400 pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.customer_price_total || 0) - ((i.your_cost_unit || 0) * (i.quantity || 0))), 0))}</td>
@@ -417,7 +498,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-fp-border">
-                    {['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
+                    {['Role', 'Section', ...(locationBreakdown.length > 0 ? ['Location'] : []), 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
                       <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
@@ -434,6 +515,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                       <tr key={i} className="border-b border-fp-border/30">
                         <td className="text-fp-text py-2 pr-3 font-medium">{l.role || '—'}</td>
                         <td className="text-fp-muted py-2 pr-3">{l._sectionName || '—'}</td>
+                        {locationBreakdown.length > 0 && <td className="text-fp-muted py-2 pr-3">{l._locationName || '—'}</td>}
                         <td className="text-fp-text py-2 pr-3">{qty > 0 ? `${qty} ${l.unit || 'hr'}` : '—'}</td>
                         <td className="text-fp-text py-2 pr-3">${fmt(costPerUnit)}</td>
                         <td className="text-fp-text py-2 pr-3">${fmt(revenue)}</td>

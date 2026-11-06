@@ -99,7 +99,13 @@ Deno.serve(async (req) => {
           `${supabaseUrl}/rest/v1/followup_log?proposal_id=eq.${proposal.id}&days_until_close=eq.${activeThreshold}`,
           { headers: dbHeaders }
         )
+        if (!logRes.ok) {
+          console.error(`followup_log check failed (${logRes.status}) for proposal ${proposal.id} — skipping to avoid duplicate send`)
+          skipped++
+          continue
+        }
         const log = await logRes.json()
+        if (!Array.isArray(log)) { skipped++; continue }
         if (log.length > 0) { skipped++; continue }
 
         const companyName = profile.company_name || proposal.company || 'our team'
@@ -229,11 +235,15 @@ Deno.serve(async (req) => {
           console.error(`Rep email failed for ${proposal.id}:`, e)
         }
 
-        await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
+        const logInsertRes = await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
           method: 'POST',
           headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
           body: JSON.stringify({ proposal_id: proposal.id, days_until_close: activeThreshold })
         })
+        if (!logInsertRes.ok) {
+          const logErr = await logInsertRes.text()
+          console.error(`followup_log insert failed for proposal ${proposal.id}:`, logErr)
+        }
 
         const activityTitle = activeThreshold === 0
           ? `Close-date follow-up sent to ${clientName}`

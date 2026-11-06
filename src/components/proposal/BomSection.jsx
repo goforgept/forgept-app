@@ -1396,7 +1396,7 @@ export default function BomSection({
                         const locSections = editSections.filter(s => s.proposal_location_id === loc.id)
                         return (
                           <div key={loc.id} className="border border-fp-border rounded-xl overflow-hidden">
-                            <div className="flex items-center gap-2 px-4 py-2.5 bg-fp-inset/60 border-b border-fp-border">
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-fp-inset/60 border-b border-fp-border flex-wrap">
                               <span className="text-fp-brand font-bold text-sm">{loc.name || 'Unnamed Location'}</span>
                               {(loc.city || loc.state) && <span className="text-fp-muted text-xs">{[loc.city, loc.state].filter(Boolean).join(', ')}</span>}
                               <span className="text-fp-muted text-xs ml-auto">{locSections.length} section{locSections.length !== 1 ? 's' : ''}</span>
@@ -1426,11 +1426,11 @@ export default function BomSection({
 
                 {proposalLocations.length === 0 && editSections.map(section => (
                   <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset border-b border-fp-border flex-wrap">
                       <div className="w-1.5 h-6 rounded-full bg-[#C8622A] flex-shrink-0" />
                       <input type="text" value={section.name} onChange={e => onUpdateSection(section.id, 'name', e.target.value)}
                         placeholder="Section name (e.g. Floor 1, Server Room)"
-                        className="flex-1 bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
+                        className="flex-1 min-w-[120px] bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
                       <label className="flex items-center gap-2 cursor-pointer">
                         <span className="text-fp-muted text-xs">Include Labor</span>
                         <button onClick={() => onUpdateSection(section.id, 'include_labor', !section.include_labor)}

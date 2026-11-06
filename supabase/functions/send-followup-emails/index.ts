@@ -179,7 +179,13 @@ Deno.serve(async (req) => {
           `${supabaseUrl}/rest/v1/followup_log?proposal_id=eq.${proposal.id}&days_until_close=eq.${daysUntilClose}`,
           { headers: dbHeaders }
         )
+        if (!logRes.ok) {
+          console.error(`followup_log check failed (${logRes.status}) for proposal ${proposal.id} — skipping to avoid duplicate send`)
+          skipped++
+          continue
+        }
         const log = await logRes.json()
+        if (!Array.isArray(log)) { skipped++; continue }
         if (log.length > 0) { skipped++; continue }
 
         const companyName = profile.company_name || proposal.company || 'our team'

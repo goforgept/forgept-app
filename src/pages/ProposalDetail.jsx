@@ -1086,9 +1086,17 @@ export default function ProposalDetail({ isAdmin }) {
         repName: proposal.rep_name,
         laborItems: laborItems,
         aiNotes: aiNotes,
+        locations: proposalLocations.map(l => ({
+          id: l.id,
+          name: l.name,
+          address: l.address,
+          city: l.city,
+          state: l.state,
+        })),
         sections: sections.map(s => ({
           id: s.id,
           name: s.name,
+          locationId: s.proposal_location_id || null,
           laborItems: s.include_labor ? (s.labor_items || []) : [],
         })),
         lineItems: lineItems.map(l => ({

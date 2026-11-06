@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
   try {
     const {
       proposalId, company, clientName, jobDesc,
-      industry, repName, lineItems, laborItems, aiNotes, sections
+      industry, repName, lineItems, laborItems, aiNotes, sections, locations
     } = await req.json()
 
     // Step 4: Verify proposal belongs to caller's org
@@ -94,26 +94,50 @@ Deno.serve(async (req) => {
     let materialsText = ''
 
     if (sections && sections.length > 0) {
-      // Group items by section
       const unsectioned = (lineItems || []).filter((l: any) => !l.sectionId)
-      const sectionBlocks: string[] = []
+      const topBlocks: string[] = []
 
-      for (const sec of sections) {
+      const buildSectionBlock = (sec: any) => {
         const secItems = (lineItems || []).filter((l: any) => l.sectionId === sec.id)
         const secLabor = formatLabor(sec.laborItems || [])
-        if (secItems.length === 0 && !secLabor) continue
-        const itemLines = secItems.map((l: any) => `  • ${l.itemName} (Qty: ${l.quantity})`).join('\n')
-        let block = `[${sec.name}]\n${itemLines}`
-        if (secLabor) block += `\n  Labor:\n${secLabor}`
-        sectionBlocks.push(block)
+        if (secItems.length === 0 && !secLabor) return null
+        const itemLines = secItems.map((l: any) => `    • ${l.itemName} (Qty: ${l.quantity})`).join('\n')
+        let block = `  [${sec.name}]\n${itemLines}`
+        if (secLabor) block += `\n    Labor:\n${secLabor}`
+        return block
+      }
+
+      if (locations && locations.length > 0) {
+        // Group sections under location headers
+        for (const loc of locations) {
+          const locSections = (sections || []).filter((s: any) => s.locationId === loc.id)
+          const secBlocks = locSections.map(buildSectionBlock).filter(Boolean)
+          if (secBlocks.length === 0) continue
+          const addrParts = [loc.address, loc.city, loc.state].filter(Boolean)
+          const locHeader = addrParts.length > 0
+            ? `[Location: ${loc.name} — ${addrParts.join(', ')}]`
+            : `[Location: ${loc.name}]`
+          topBlocks.push(`${locHeader}\n${secBlocks.join('\n\n')}`)
+        }
+        // Sections not assigned to any location
+        const unlocatedSections = (sections || []).filter((s: any) => !s.locationId)
+        for (const sec of unlocatedSections) {
+          const block = buildSectionBlock(sec)
+          if (block) topBlocks.push(block.trimStart())
+        }
+      } else {
+        for (const sec of sections) {
+          const block = buildSectionBlock(sec)
+          if (block) topBlocks.push(block.trimStart())
+        }
       }
 
       if (unsectioned.length > 0) {
         const lines = unsectioned.map((l: any) => `  • ${l.itemName} (Qty: ${l.quantity})`).join('\n')
-        sectionBlocks.push(`[General]\n${lines}`)
+        topBlocks.push(`[General]\n${lines}`)
       }
 
-      materialsText = sectionBlocks.join('\n\n')
+      materialsText = topBlocks.join('\n\n')
     } else {
       // No sections — flat list
       materialsText = (lineItems || [])
@@ -155,6 +179,7 @@ RULES:
 - DO NOT add materials or tasks not in the sections above
 - The first sentence MUST start with: "${company} will provide and install..."
 - If there are multiple named sections, briefly reference each system/area by name in the SOW
+- If there are multiple named locations, structure the SOW to address each location (e.g. "At Site A, ... At Site B, ...") — make clear this is a multi-site scope
 - Follow the rep's Priority Instructions above as the primary guide for tone, content, and emphasis
 
 Write 2–3 short professional paragraphs as the Scope of Work only. Do NOT list the materials or labor items — they will be printed separately in the proposal document.`

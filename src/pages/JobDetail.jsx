@@ -84,6 +84,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   // Freeform PO line items (from purchase_order_line_items where job_id = id)
   const [freeformPOItems, setFreeformPOItems] = useState([])
   const [proposalSections, setProposalSections] = useState([])
+  const [proposalLocations, setProposalLocations] = useState([])
   const [laborRates, setLaborRates] = useState([])
 
   // Bulk BOM edit
@@ -179,10 +180,17 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
       const { data: sectionsData } = await supabase
         .from('proposal_sections')
-        .select('id, name, include_labor, labor_items')
+        .select('id, name, include_labor, labor_items, proposal_location_id')
         .eq('proposal_id', jobData.proposal_id)
         .order('position')
-      setProposalSections((sectionsData || []).filter(s => s.include_labor && (s.labor_items || []).length > 0))
+      setProposalSections(sectionsData || [])
+
+      const { data: locData } = await supabase
+        .from('proposal_locations')
+        .select('id, name, address, city, state')
+        .eq('proposal_id', jobData.proposal_id)
+        .order('sort_order', { ascending: true })
+      setProposalLocations(locData || [])
 
       const { data: lineData } = await supabase
         .from('bom_line_items')
@@ -1913,6 +1921,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             job={job}
             proposal={proposal}
             proposalSections={proposalSections}
+            proposalLocations={proposalLocations}
             lineItems={lineItems}
             freeformPOItems={freeformPOItems}
             changeOrders={changeOrders}
