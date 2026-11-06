@@ -185,6 +185,7 @@ export default function NewProposal() {
       company: form.company,
       client_email: form.client_email,
       close_date: form.close_date,
+      quote_expires_at: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split('T')[0] })(),
       industry: form.industry,
       job_description: form.job_description,
       status: 'Draft',
