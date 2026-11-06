@@ -262,8 +262,36 @@ export default function ProposalHeader({
         </div>
       )}
 
-      {/* CRM cells */}
+      {/* KPI row — Deal Amount + Margin */}
       <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-col gap-1 bg-fp-inset border border-fp-border rounded-lg px-4 py-3 min-w-[150px] focus-within:border-fp-brand/40 hover:border-fp-border/80 transition-colors">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fp-muted/70 select-none">Deal Amount</span>
+          {canEdit ? (
+            <div className="flex items-center gap-0.5">
+              <span className="text-fp-muted text-base font-semibold">$</span>
+              <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
+                onChange={e => { setDealAmountDraft(e.target.value); setDealAmountDirty(true) }}
+                onBlur={e => { if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) } }}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null; setDealAmountDraft(v != null ? String(v) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
+                className="bg-transparent text-[#C8622A] text-xl font-bold focus:outline-none placeholder-fp-muted/30 w-full" />
+            </div>
+          ) : (
+            <span className="text-[#C8622A] text-xl font-bold">
+              {dealDisplayVal != null ? `$${Number(dealDisplayVal).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1 bg-fp-inset border border-fp-border rounded-lg px-4 py-3 min-w-[100px]">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fp-muted/70 select-none">Margin</span>
+          <span className="text-xl font-bold text-fp-brand">
+            {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Reference fields — secondary row */}
+      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-fp-border/40">
 
         <Cell label="Rep" className="min-w-[120px]">
           {isAdmin && onUpdateRep && orgProfiles?.length > 0 ? (
@@ -320,23 +348,6 @@ export default function ProposalHeader({
           )}
         </Cell>
 
-        <Cell label="Deal Amount" className="min-w-[120px]">
-          {canEdit ? (
-            <div className="flex items-center gap-0.5">
-              <span className="text-fp-muted text-sm">$</span>
-              <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
-                onChange={e => { setDealAmountDraft(e.target.value); setDealAmountDirty(true) }}
-                onBlur={e => { if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) } }}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null; setDealAmountDraft(v != null ? String(v) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
-                className={inputCls} />
-            </div>
-          ) : (
-            <span className="text-fp-text text-sm font-bold text-[#C8622A]">
-              {dealDisplayVal != null ? `$${Number(dealDisplayVal).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
-            </span>
-          )}
-        </Cell>
-
         <Cell label="Industry" className="min-w-[110px]">
           {canEdit && updateIndustry ? (
             <select value={proposal?.industry || ''} onChange={e => updateIndustry(e.target.value)}
@@ -349,12 +360,6 @@ export default function ProposalHeader({
           ) : (
             <span className="text-fp-text text-sm font-medium">{proposal?.industry || '—'}</span>
           )}
-        </Cell>
-
-        <Cell label="Margin" className="min-w-[75px]">
-          <span className="text-sm font-semibold text-fp-brand">
-            {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
-          </span>
         </Cell>
 
         <Cell label="Tax" className="min-w-[85px]">
