@@ -33,6 +33,7 @@ export default function ProposalHeader({
   const dealDisplayVal = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null
   const [dealAmountDraft, setDealAmountDraft] = useState(dealDisplayVal != null ? String(dealDisplayVal) : '')
   const [dealAmountDirty, setDealAmountDirty] = useState(false)
+  const [dealAmountFocused, setDealAmountFocused] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
 
@@ -268,11 +269,21 @@ export default function ProposalHeader({
           <span className="text-[10px] font-semibold uppercase tracking-wider text-fp-muted/70 select-none">Deal Amount</span>
           {canEdit ? (
             <div className="flex items-center gap-0.5">
-              <span className="text-fp-muted text-base font-semibold">$</span>
-              <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
+              {!dealAmountFocused && <span className="text-[#C8622A] text-xl font-bold select-none">$</span>}
+              <input
+                type={dealAmountFocused ? 'number' : 'text'}
+                min="0" step="0.01"
+                value={dealAmountFocused
+                  ? dealAmountDraft
+                  : (dealAmountDraft !== '' ? Number(dealAmountDraft).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')}
+                placeholder="0.00"
                 onChange={e => { setDealAmountDraft(e.target.value); setDealAmountDirty(true) }}
-                onBlur={e => { if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) } }}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null; setDealAmountDraft(v != null ? String(v) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
+                onFocus={() => setDealAmountFocused(true)}
+                onBlur={e => {
+                  setDealAmountFocused(false)
+                  if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) }
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null; setDealAmountDraft(v != null ? String(v) : ''); setDealAmountDirty(false); setDealAmountFocused(false); e.currentTarget.blur() } }}
                 className="bg-transparent text-[#C8622A] text-xl font-bold focus:outline-none placeholder-fp-muted/30 w-full" />
             </div>
           ) : (
