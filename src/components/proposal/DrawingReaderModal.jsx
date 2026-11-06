@@ -1,4 +1,4 @@
-export default function DrawingReaderModal({ drawingFile, setDrawingFile, drawingInstructions, setDrawingInstructions, drawingPreview, setDrawingPreview, analyzingDrawing, onAnalyze, onApply, onClose }) {
+export default function DrawingReaderModal({ drawingFile, setDrawingFile, drawingInstructions, setDrawingInstructions, drawingPreview, setDrawingPreview, analyzingDrawing, onAnalyze, onApply, onClose, applyLabel }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -56,7 +56,7 @@ export default function DrawingReaderModal({ drawingFile, setDrawingFile, drawin
             <button onClick={onClose} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
             {drawingPreview.length > 0 && (
               <button onClick={onApply} className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                Add {drawingPreview.length} Items to BOM →
+                {applyLabel || `Add ${drawingPreview.length} Items to BOM →`}
               </button>
             )}
           </div>

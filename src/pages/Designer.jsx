@@ -11,6 +11,7 @@ import DrawingSheet from '../components/drawing/DrawingSheet'
 import SymbolPicker from '../components/drawing/SymbolPicker'
 import DrawingBOMPreview from '../components/drawing/DrawingBOMPreview'
 import DrawingExport from '../components/drawing/DrawingExport'
+import DrawingReaderModal from '../components/proposal/DrawingReaderModal'
 import SheetTab from '../components/designer/SheetTab'
 import PlacementPanel from '../components/designer/PlacementPanel'
 import CablePanel from '../components/designer/CablePanel'
@@ -58,7 +59,13 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const stageRefs = useRef({}) // sheetId -> Konva stage
   const [bomRefreshKey,          setBomRefreshKey]          = useState(0)
   const [placementsRefreshKey,   setPlacementsRefreshKey]   = useState(0)
-  const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom'
+  const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom' | 'racks' | 'sld' | 'export'
+  const [showDrawingModal,    setShowDrawingModal]    = useState(false)
+  const [drawingFile,         setDrawingFile]         = useState(null)
+  const [drawingInstructions, setDrawingInstructions] = useState('')
+  const [drawingPreview,      setDrawingPreview]      = useState([])
+  const [analyzingDrawing,    setAnalyzingDrawing]    = useState(false)
+  const [drawingAnalysis,     setDrawingAnalysis]     = useState(null) // stored analysis result
   const [sidebarOpen,     setSidebarOpen]     = useState(true)
   const [showFireAlarmAck, setShowFireAlarmAck] = useState(false)
   const [fireAlarmAck,    setFireAlarmAck]    = useState({
@@ -489,6 +496,40 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     }
   }
 
+  const analyzeDrawing = async () => {
+    if (!drawingFile) return
+    setAnalyzingDrawing(true)
+    setDrawingPreview([])
+    try {
+      const reader = new FileReader()
+      const fileBase64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(drawingFile)
+      })
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-read-drawing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
+        body: JSON.stringify({ fileBase64, mediaType: drawingFile.type, instructions: drawingInstructions || '', industry: proposal?.industry || '' })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setDrawingPreview(data.items || [])
+    } catch (err) { alert('Error analyzing drawing: ' + err.message) }
+    setAnalyzingDrawing(false)
+  }
+
+  const applyDrawingAnalysis = () => {
+    if (drawingPreview.length === 0) return
+    setDrawingAnalysis({ items: drawingPreview, analyzedAt: new Date().toISOString(), fileName: drawingFile?.name || 'Drawing' })
+    setShowDrawingModal(false)
+    setDrawingFile(null)
+    setDrawingInstructions('')
+    setDrawingPreview([])
+    setActiveTab('bom')
+  }
+
   const handleFireAlarmAckConfirm = () => {
     if (!Object.values(fireAlarmAck).every(Boolean)) {
       alert('Please acknowledge all items before continuing.')
@@ -618,8 +659,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               { id: 'canvas', label: 'Drawing' },
               { id: 'racks',  label: 'Rooms & Racks' },
               { id: 'sld',    label: 'Single Line' },
-              { id: 'bom',    label: 'BOM Preview' },
-              { id: 'export', label: 'Export' },
+              { id: 'bom',    label: 'BOM & Summary' },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
@@ -629,6 +669,19 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               </button>
             ))}
           </div>
+
+          {/* Export icon button */}
+          <button onClick={() => setActiveTab('export')}
+            title="Export"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
+              activeTab === 'export'
+                ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            </svg>
+          </button>
 
           {/* Sign out — shown for designer-only users who have no sidebar */}
           {featureDesignerOnly && !featureDrawingTool && (
@@ -1046,9 +1099,65 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
           <SLDTab proposalId={proposalId} orgId={orgId} />
         )}
 
-        {/* BOM Preview tab */}
+        {/* BOM & Summary tab */}
         {activeTab === 'bom' && (
           <div className="flex-1 overflow-auto">
+
+            {/* Drawing Analysis Section */}
+            <div className="border-b border-[#2a3d55]">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-[#1a2d45]">
+                <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Drawing Analysis</p>
+                <button onClick={() => setShowDrawingModal(true)}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-lg bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white hover:border-[#C8622A]/40 transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+                  </svg>
+                  {drawingAnalysis ? 'Re-analyze' : 'Analyze Drawing'}
+                </button>
+              </div>
+
+              {!drawingAnalysis ? (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-white font-medium mb-1">No drawing analyzed yet</p>
+                  <p className="text-xs text-[#8A9AB0]">Upload a floor plan and AI will count devices to guide your placement.</p>
+                </div>
+              ) : (
+                <div className="px-4 py-3 space-y-1">
+                  <p className="text-[#8A9AB0] text-xs mb-2">
+                    From <span className="text-white">{drawingAnalysis.fileName}</span> · {new Date(drawingAnalysis.analyzedAt).toLocaleDateString()}
+                  </p>
+                  {(() => {
+                    const grouped = drawingAnalysis.items.reduce((acc, item) => {
+                      const key = item.category || 'Other'
+                      if (!acc[key]) acc[key] = { count: 0, items: [] }
+                      acc[key].count += item.quantity
+                      acc[key].items.push(item)
+                      return acc
+                    }, {})
+                    return Object.entries(grouped).map(([category, { count, items }]) => (
+                      <div key={category} className="bg-[#0F1C2E] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-white text-xs font-semibold">{category}</span>
+                          <span className="text-[#C8622A] text-xs font-bold">{count} found</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {items.map((item, i) => (
+                            <div key={i} className="flex items-start justify-between gap-2">
+                              <span className="text-[#8A9AB0] text-xs">{item.item_name}</span>
+                              <span className="text-[#8A9AB0] text-xs flex-shrink-0">× {item.quantity}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {items.some(i => i.notes) && (
+                          <p className="text-[#4a5a6a] text-xs mt-1.5 italic">{items.find(i => i.notes)?.notes}</p>
+                        )}
+                      </div>
+                    ))
+                  })()}
+                </div>
+              )}
+            </div>
+
             <DrawingBOMPreview
               proposalId={proposalId}
               orgId={orgId}
@@ -1154,6 +1263,23 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       )}
 
       {/* ── Pre-approval BOM Review Modal ── */}
+      {/* Drawing Reader Modal */}
+      {showDrawingModal && (
+        <DrawingReaderModal
+          drawingFile={drawingFile}
+          setDrawingFile={setDrawingFile}
+          drawingInstructions={drawingInstructions}
+          setDrawingInstructions={setDrawingInstructions}
+          drawingPreview={drawingPreview}
+          setDrawingPreview={setDrawingPreview}
+          analyzingDrawing={analyzingDrawing}
+          onAnalyze={analyzeDrawing}
+          onApply={applyDrawingAnalysis}
+          applyLabel={drawingPreview.length > 0 ? `Save Analysis (${drawingPreview.length} device types) →` : undefined}
+          onClose={() => { setShowDrawingModal(false); setDrawingFile(null); setDrawingInstructions(''); setDrawingPreview([]) }}
+        />
+      )}
+
       {showApproveModal && approveData && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
