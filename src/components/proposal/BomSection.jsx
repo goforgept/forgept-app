@@ -1443,6 +1443,62 @@ export default function BomSection({
                     </div>
                     <div className="p-4">
                       {BOMTable({ sectionId: section.id, sectionLabel: section.name || 'this section' })}
+                      {section.include_labor && (
+                        <div className="mt-4 pt-4 border-t border-fp-border">
+                          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Section Labor</p>
+                          <div className="lg:hidden space-y-3">
+                            {(section.labor_items || []).map((item, idx) => {
+                              const draftKey = `s_${section.id}_${idx}`
+                              return (
+                                <div key={idx} className="rounded-xl border border-fp-border bg-fp-inset p-3 space-y-2">
+                                  <input type="text" placeholder="Role" list="labor-roles-list" value={item.role || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" placeholder="Qty" value={item.quantity || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'quantity', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                                    <select value={item.unit || 'hr'} onChange={e => onUpdateSectionLabor(section.id, idx, 'unit', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                                      {['hr','day','lot'].map(u => <option key={u}>{u}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div><label className="text-fp-muted text-xs mb-1 block">Your Cost</label><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'your_cost', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" /></div>
+                                    <div><label className="text-fp-muted text-xs mb-1 block">Markup %</label><input type="number" placeholder="0" value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'markup', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" /></div>
+                                    <div><label className="text-fp-muted text-xs mb-1 block">Total</label><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'customer_price', e.target.value)} className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand font-semibold" /></div>
+                                  </div>
+                                  <button onClick={() => onRemoveSectionLaborLine(section.id, idx)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕ Remove</button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="hidden lg:block overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-fp-border">
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Role</th>
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Qty</th>
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Unit</th>
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Your Cost/hr</th>
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Markup %</th>
+                                  <th className="text-fp-muted font-normal text-left py-2 pr-3">Total</th>
+                                  <th className="py-2" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(section.labor_items || []).map((item, idx) => (
+                                  <tr key={idx} className="border-b border-fp-border/30">
+                                    <td className="pr-2 py-1"><input type="text" placeholder="Role" list="labor-roles-list" value={item.role || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
+                                    <td className="pr-2 py-1 w-20"><input type="number" placeholder="0" value={item.quantity || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'quantity', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
+                                    <td className="pr-2 py-1 w-20"><select value={item.unit || 'hr'} onChange={e => onUpdateSectionLabor(section.id, idx, 'unit', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">{['hr','day','lot'].map(u => <option key={u}>{u}</option>)}</select></td>
+                                    <td className="pr-2 py-1 w-28"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'your_cost', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
+                                    <td className="pr-2 py-1 w-24"><input type="number" placeholder="0" value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'markup', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
+                                    <td className="pr-2 py-1 w-28"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'customer_price', e.target.value)} className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" /></td>
+                                    <td className="py-1"><button onClick={() => onRemoveSectionLaborLine(section.id, idx)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <button onClick={() => onAddSectionLaborLine(section.id)} className="mt-3 text-xs text-fp-brand hover:text-fp-text transition-colors">+ Add Labor Line</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
