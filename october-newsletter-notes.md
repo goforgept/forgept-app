@@ -20,5 +20,17 @@
 
 ## Proposals
 - Status filter is now multi-select — pick Draft + Sent + Won at the same time, etc.
-- Generate PO removed from proposal BOM (POs now live on jobs)
-- Delete (✕) button on BOM line items moved to after the Move button
+- Add products into the library right from the BOM.
+- duplicate a proposal
+- add locations to your sections so you can deploy a multi location project on one proposal.
+- duplicate a section
+
+
+## Mobile App
+- Now on Android Play Store
+- Test Flight for IOS users - will be on Apple Store soon
+- using the browser from a mobile device is still mobile friendly
+- adjusted the BOM table to be easier to see and manage from a mobile device
+- offline mode for designer tool is in testing phase - this allows you to use the designer if you have no internet. 
+
+

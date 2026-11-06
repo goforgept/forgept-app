@@ -837,13 +837,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     ]
     summaryBoxes.forEach((box, i) => {
       const x = 14 + i * (boxW + 3)
-      doc.setFillColor(245, 247, 250); doc.rect(x, y, boxW, 22, 'F')
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
-      doc.text(box.label.toUpperCase(), x + 4, y + 7)
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(box.value, x + 4, y + 17)
+      doc.setFillColor(15, 28, 46); doc.rect(x, y, boxW, 26, 'F')
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 175, 195)
+      doc.text(box.label.toUpperCase(), x + 5, y + 8)
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+      doc.text(box.value, x + 5, y + 20)
     })
-    y += 30
+    y += 34
 
     const pdfRows = [
       ['Materials', `$${quotedMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedMaterials - costMaterials).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedMaterials > 0 ? `${((quotedMaterials - costMaterials) / quotedMaterials * 100).toFixed(1)}%` : '—'],
@@ -860,8 +860,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     y = doc.lastAutoTable.finalY + 10
 
     if (lineItems.length > 0) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Materials — Line Item Detail', 14, y); y += 4
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.rect(14, y, 2, 10, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
+      doc.text('Materials — Line Item Detail', 20, y + 7); y += 14
       autoTable(doc, {
         startY: y, head: [['Item', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Customer Price', 'Margin']],
         body: lineItems.map(item => {
@@ -879,19 +880,21 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       ...(proposalSections || []).flatMap(s => (s.labor_items || []).map(l => ({ ...l, _sectionName: s.name }))),
     ]
     if (allLaborForPDF.length > 0) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Labor — Line Item Detail', 14, y); y += 4
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.rect(14, y, 2, 10, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
+      doc.text('Labor — Line Item Detail', 20, y + 7); y += 14
       autoTable(doc, {
-        startY: y, head: [['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin']],
-        body: allLaborForPDF.map(l => [l.role || '—', l._sectionName || '—', `${parseFloat(l.quantity) || 0} ${l.unit || 'hr'}`, `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        startY: y, head: [['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin %']],
+        body: allLaborForPDF.map(l => { const cp = parseFloat(l.customer_price) || 0; const yc = parseFloat(l.your_cost) || 0; return [l.role || '—', l._sectionName || '—', `${parseFloat(l.quantity) || 0} ${l.unit || 'hr'}`, `$${yc.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${cp.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, cp > 0 ? `${((cp - yc) / cp * 100).toFixed(1)}%` : '—'] }),
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
 
     if (freeformPOItems.length > 0) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Freeform PO Line Items', 14, y); y += 4
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.rect(14, y, 2, 10, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
+      doc.text('Freeform PO Line Items', 20, y + 7); y += 14
       autoTable(doc, {
         startY: y, head: [['PO #', 'Vendor', 'Item', 'Qty', 'Unit Cost', 'Total']],
         body: freeformPOItems.map(l => [l.purchase_orders?.po_number || '—', l.purchase_orders?.vendor_name || '—', l.item_name, `${l.quantity} ${l.unit || ''}`, `$${(l.unit_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(l.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
@@ -901,8 +904,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     }
 
     if (changeOrders.length > 0) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Change Orders', 14, y); y += 4
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.rect(14, y, 2, 10, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 20, 30)
+      doc.text('Change Orders', 20, y + 7); y += 14
       autoTable(doc, {
         startY: y, head: [['Name', 'Status', 'Amount', 'Your Cost']],
         body: changeOrders.map(co => {
