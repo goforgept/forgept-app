@@ -208,8 +208,9 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
       const fallbackMM = Math.min(imgW, imgH) * 0.08
       const computed = imgNaturalW && sheet.scale_ratio ? (imgW / (imgNaturalW * sheet.scale_ratio)) * rangeInFeet : null
       const rangeInMM = (computed && isFinite(computed) && computed > 0) ? computed : fallbackMM
+      const fovOpacityPct = p.fov_opacity ?? 50
       pdf.saveGraphicsState()
-      pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
+      pdf.setGState(pdf.GState({ opacity: (fovOpacityPct / 100) * 0.25, 'stroke-opacity': (fovOpacityPct / 100) * 0.8 }))
       pdf.setFillColor(r, g, b); pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.3)
       if (category === 'PTZ Camera' || fovAngle >= 355) {
         pdf.circle(px, py, rangeInMM, 'FD')
@@ -917,8 +918,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           ? (imgW / (imgNaturalW * sheet.scale_ratio)) * rangeInFeet
           : null
         const rangeInMM   = (computed && isFinite(computed) && computed > 0) ? computed : fallbackMM
+        const fovOpacityPct = p.fov_opacity ?? 50
         pdf.saveGraphicsState()
-        pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
+        pdf.setGState(pdf.GState({ opacity: (fovOpacityPct / 100) * 0.25, 'stroke-opacity': (fovOpacityPct / 100) * 0.8 }))
         pdf.setFillColor(r, g, b)
         pdf.setDrawColor(r, g, b)
         pdf.setLineWidth(0.3)
