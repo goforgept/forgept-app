@@ -94,6 +94,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     rise_cable_type:        p.rise_cable_type        || 'Cat6',
     fov_angle:              p.fov_angle              || null,
     fov_range:              p.fov_range              || null,
+    fov_opacity:            p.fov_opacity            ?? 50,
     serial_number:          p.serial_number          || '',
     ip_address:             p.ip_address             || '',
     mac_address:            p.mac_address            || '',
@@ -182,7 +183,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   }, [placement.id])
 
   // Only these fields have visible impact on the canvas marker — all others are text-only
-  const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'device_address'])
+  const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'fov_opacity', 'device_address'])
 
   const update = (field, value) => {
     const updated = { ...form, [field]: value }
@@ -210,6 +211,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
           rise_cable_type:       f.rise_cable_type || null,
           fov_angle:             f.fov_angle ? parseInt(f.fov_angle) : null,
           fov_range:             f.fov_range ? parseInt(f.fov_range) : null,
+          fov_opacity:           f.fov_opacity != null ? parseInt(f.fov_opacity) : 50,
         serial_number:         f.serial_number         || null,
         ip_address:            f.ip_address            || null,
         mac_address:           f.mac_address           || null,
@@ -622,6 +624,18 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                         className="flex-1 accent-[#C8622A]" />
                       <span className="text-[#8A9AB0] text-xs w-10 text-right">
                         {form.fov_angle || placement.global_products?.specs?.fov_angle || 90}°
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>FOV Opacity</label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="10" max="100" step="5"
+                        value={form.fov_opacity ?? 50}
+                        onChange={e => update('fov_opacity', parseInt(e.target.value))}
+                        className="flex-1 accent-[#C8622A]" />
+                      <span className="text-[#8A9AB0] text-xs w-10 text-right">
+                        {form.fov_opacity ?? 50}%
                       </span>
                     </div>
                   </div>

@@ -1953,6 +1953,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
                   const isSelected = selectedId === placement.id
                   const drag       = isSelected ? draggingFOV : null
                   const col        = placement.marker_color || '#C8622A'
+                  const fovOpacity = (placement.fov_opacity ?? 50) / 100
 
                   const rotation    = drag?.rotation    ?? placement.rotation    ?? 0
                   const fovAngle    = drag?.fov_angle   ?? placement.fov_angle   ?? product.specs?.fov_angle ?? (category === 'PTZ Camera' ? 360 : 90)
@@ -1983,7 +1984,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
                   // PTZ / full circle
                   if (category === 'PTZ Camera' || fovAngle >= 355) {
                     return (
-                      <Group key={`fov_${placement.id}`}>
+                      <Group key={`fov_${placement.id}`} opacity={fovOpacity}>
                         <Circle x={px} y={py} radius={range}
                           fill={`${col}14`} stroke={`${col}55`} strokeWidth={isSelected ? 1.5 : 1}
                           listening={false} />
@@ -2031,7 +2032,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
                   const rhy = py + Math.sin(ea) * range
 
                   return (
-                    <Group key={`fov_${placement.id}`}>
+                    <Group key={`fov_${placement.id}`} opacity={fovOpacity}>
                       {/* Cone fill */}
                       <Line points={linePoints}
                         fill={isSelected ? `${col}22` : `${col}1a`}
