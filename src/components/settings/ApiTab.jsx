@@ -3,12 +3,15 @@ import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
 const SCOPES = [
+  { value: 'agent:mcp',       label: 'AI Agent (MCP)',    desc: 'Full read/write access for AI agents — Claude, ChatGPT, Grok, and other MCP-compatible tools' },
   { value: 'read:proposals',  label: 'Proposals',         desc: 'Read proposals, BOM line items, labor' },
   { value: 'read:clients',    label: 'Clients',            desc: 'Read clients and contacts' },
   { value: 'read:jobs',       label: 'Jobs',               desc: 'Read jobs and job details' },
   { value: 'read:drawings',   label: 'Designer (read)',    desc: 'Read floor plans and device placements via API' },
   { value: 'embed:designer',  label: 'Designer (embed)',   desc: 'Embed the interactive designer in your own platform' },
 ]
+
+const MCP_SERVER_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server'
 
 async function sha256hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
@@ -165,8 +168,14 @@ export default function ApiTab({ featureApi }) {
 
       {/* Key type overview */}
       {!showForm && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
+            {
+              title: 'AI Agent (MCP)',
+              scopes: 'agent:mcp',
+              desc: 'Connect Claude, ChatGPT, Grok, or any MCP-compatible AI agent to your ForgePt data. Agents can read and update proposals, build BOMs, log activity, and more.',
+              examples: ['Pull product specs from Brivo or Hanwha into a proposal', 'Ask Claude to summarize your pipeline', 'Have an agent add devices to a BOM from a Brivo quote'],
+            },
             {
               title: 'Data API',
               scopes: 'read:proposals · read:clients · read:jobs · read:drawings',
@@ -288,6 +297,78 @@ export default function ApiTab({ featureApi }) {
       {/* Docs */}
       {keys.length > 0 && (
         <div className="space-y-4">
+
+          {/* MCP connection instructions — shown when any key has agent:mcp scope */}
+          {keys.some(k => k.scopes?.includes('agent:mcp')) && (
+            <div className="bg-fp-inset rounded-xl p-4 border border-fp-brand/30 space-y-4">
+              <div>
+                <p className="text-fp-brand text-xs font-semibold uppercase tracking-wide mb-1">Connect to AI Agent (MCP)</p>
+                <p className="text-fp-muted text-xs">Use this server URL and your <span className="font-mono text-fp-brand">agent:mcp</span> key to connect ForgePt to Claude, ChatGPT, Grok, or any MCP-compatible assistant. Your agent can then read your pipeline, build BOMs, and work alongside manufacturer MCP servers like Brivo.</p>
+              </div>
+
+              <div>
+                <p className="text-fp-text text-xs font-semibold mb-1">Server URL</p>
+                <code className="block bg-fp-card text-fp-brand font-mono text-xs px-3 py-2 rounded-lg break-all">{MCP_SERVER_URL}</code>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-fp-text text-xs font-semibold">Setup by platform</p>
+
+                {/* Claude Desktop / claude.ai */}
+                <div>
+                  <p className="text-fp-muted text-xs font-semibold mb-1">Claude Desktop (claude.ai/settings → Connectors)</p>
+                  <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`{
+  "mcpServers": {
+    "forgept": {
+      "url": "${MCP_SERVER_URL}",
+      "headers": {
+        "Authorization": "Bearer fpk_your_key_here"
+      }
+    }
+  }
+}`}</pre>
+                </div>
+
+                {/* ChatGPT */}
+                <div>
+                  <p className="text-fp-muted text-xs font-semibold mb-1">ChatGPT (Actions / Custom GPT connector)</p>
+                  <p className="text-fp-muted text-xs mb-1">In your GPT's Action schema, set the server URL and add an API key auth header:</p>
+                  <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`Server URL:   ${MCP_SERVER_URL}
+Auth type:    API Key
+Header name:  Authorization
+Header value: Bearer fpk_your_key_here`}</pre>
+                </div>
+
+                {/* Grok */}
+                <div>
+                  <p className="text-fp-muted text-xs font-semibold mb-1">Grok / xAI (MCP connector settings)</p>
+                  <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`URL:   ${MCP_SERVER_URL}
+Auth:  Bearer fpk_your_key_here`}</pre>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-fp-text text-xs font-semibold mb-2">What your agent can do</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {[
+                    'Search clients & contacts', 'Create & update proposals',
+                    'Read full proposal BOM', 'Add items to a BOM',
+                    'View pipeline & deal summary', 'Log activities & tasks',
+                    'Create service tickets', 'Schedule meetings',
+                    'Search product catalog', 'Check inventory',
+                    'Create invoices', 'Pull reports',
+                  ].map(tool => (
+                    <p key={tool} className="text-fp-muted text-xs flex gap-1.5">
+                      <span className="text-fp-brand shrink-0">›</span>{tool}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-fp-muted text-xs">Keys with the <span className="font-mono text-fp-brand">agent:mcp</span> scope are org-scoped. Any agent using that key can read and act on your org's data. Treat it like a master API key — do not embed it in client-side code.</p>
+            </div>
+          )}
+
           <div className="bg-fp-inset rounded-xl p-4 border border-fp-border">
             <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Authentication</p>
             <p className="text-fp-muted text-xs mb-2">Include your key in the Authorization header on every request:</p>
