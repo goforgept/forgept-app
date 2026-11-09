@@ -51,6 +51,7 @@ import SLDProjects from './pages/SLDProjects'
 import SLD from './pages/SLD'
 import DrawingReview from './pages/DrawingReview'
 import EmbedDesigner from './pages/EmbedDesigner'
+import OAuthAuthorize from './pages/OAuthAuthorize'
 import Roadmap from './pages/Roadmap'
 import Inventory from './pages/Inventory'
 import AIAgent from './components/AIAgent'
@@ -209,6 +210,7 @@ function App() {
         <Route path="/rfq-response/:token" element={<RFQResponse />} />
         <Route path="/embed" element={<EmbedDesigner />} />
         <Route path="/designer/review/:token" element={<DrawingReview />} />
+        <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
         {!session ? (
           <Route path="*" element={<Login />} />
         ) : (

@@ -4,12 +4,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-session-id',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
+
+const MCP_BASE_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server'
+const APP_URL      = 'https://app.goforgept.com'
 
 async function sha256hex(str: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function sha256base64url(str: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+function generateApiKey(): string {
+  const arr = new Uint8Array(24)
+  crypto.getRandomValues(arr)
+  return 'fpk_' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 // ─── Tool definitions (MCP format) ───────────────────────────────────────────
@@ -814,20 +829,117 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS })
 
-  // Auth
+  const urlPath = new URL(req.url).pathname
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)
+
+  // ─── OAuth discovery (RFC 8414) — no auth ────────────────────────────────
+  if (req.method === "GET" && urlPath.includes("/.well-known/oauth-authorization-server")) {
+    return Response.json({
+      issuer: MCP_BASE_URL,
+      authorization_endpoint: `${APP_URL}/oauth/authorize`,
+      token_endpoint: `${MCP_BASE_URL}/oauth/token`,
+      registration_endpoint: `${MCP_BASE_URL}/oauth/register`,
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+      scopes_supported: ["agent:mcp"],
+    }, { headers: { ...CORS, "Cache-Control": "no-cache" } })
+  }
+
+  // ─── OAuth dynamic client registration (RFC 7591) — no auth ──────────────
+  if (req.method === "POST" && urlPath.includes("/oauth/register")) {
+    let body: any
+    try { body = await req.json() } catch {
+      return Response.json({ error: "invalid_request" }, { status: 400, headers: CORS })
+    }
+    const clientId = crypto.randomUUID()
+    const { error } = await sb.from("oauth_clients").insert({
+      client_id: clientId,
+      client_name: body.client_name || "AI Assistant",
+      redirect_uris: body.redirect_uris || [],
+    })
+    if (error) return Response.json({ error: "server_error" }, { status: 500, headers: CORS })
+    return Response.json({
+      client_id: clientId,
+      client_name: body.client_name,
+      redirect_uris: body.redirect_uris,
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+    }, { status: 201, headers: CORS })
+  }
+
+  // ─── OAuth token exchange — no auth ──────────────────────────────────────
+  if (req.method === "POST" && urlPath.includes("/oauth/token")) {
+    let params: URLSearchParams
+    try { params = new URLSearchParams(await req.text()) } catch {
+      return Response.json({ error: "invalid_request" }, { status: 400, headers: CORS })
+    }
+
+    const code         = params.get("code")
+    const clientId     = params.get("client_id")
+    const codeVerifier = params.get("code_verifier")
+
+    if (!code || !clientId || !codeVerifier) {
+      return Response.json({ error: "invalid_request", error_description: "Missing required parameters" }, { status: 400, headers: CORS })
+    }
+
+    const { data: codeRow } = await sb
+      .from("oauth_codes")
+      .select("*")
+      .eq("code", code)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle()
+
+    if (!codeRow) return Response.json({ error: "invalid_grant", error_description: "Code not found or expired" }, { status: 400, headers: CORS })
+    if (codeRow.client_id !== clientId) return Response.json({ error: "invalid_client" }, { status: 400, headers: CORS })
+
+    // PKCE S256 verification
+    const computedChallenge = await sha256base64url(codeVerifier)
+    if (computedChallenge !== codeRow.code_challenge) {
+      return Response.json({ error: "invalid_grant", error_description: "PKCE verification failed" }, { status: 400, headers: CORS })
+    }
+
+    // Create the API key
+    const rawKey = generateApiKey()
+    const keyHash = await sha256hex(rawKey)
+    const keyPrefix = rawKey.slice(0, 12)
+
+    const { error: keyErr } = await sb.from("api_keys").insert({
+      org_id:     codeRow.org_id,
+      user_id:    codeRow.user_id,
+      name:       "Claude (AI Agent)",
+      key_prefix: keyPrefix,
+      key_hash:   keyHash,
+      scopes:     ["agent:mcp"],
+      is_active:  true,
+    })
+    if (keyErr) return Response.json({ error: "server_error" }, { status: 500, headers: CORS })
+
+    await sb.from("oauth_codes").update({ used_at: new Date().toISOString() }).eq("id", codeRow.id)
+
+    return Response.json({
+      access_token: rawKey,
+      token_type:   "bearer",
+      scope:        (codeRow.scope || ["agent:mcp"]).join(" "),
+    }, { headers: CORS })
+  }
+
+  // ─── MCP JSON-RPC — auth required ────────────────────────────────────────
   const authHeader = req.headers.get("Authorization") || ""
-  const raw = authHeader.replace(/^Bearer\s+/i, "").trim()
-  if (!raw) {
+  const rawKey = authHeader.replace(/^Bearer\s+/i, "").trim()
+  if (!rawKey) {
     return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Missing API key" } }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } })
   }
 
-  const hash = await sha256hex(raw)
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)
+  const keyHash = await sha256hex(rawKey)
 
-  const { data: keyRow } = await supabase
+  const { data: keyRow } = await sb
     .from("api_keys")
     .select("id, org_id, user_id, scopes, is_active")
-    .eq("key_hash", hash)
+    .eq("key_hash", keyHash)
     .maybeSingle()
 
   if (!keyRow?.is_active) {
@@ -837,13 +949,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32003, message: "Key does not have agent:mcp scope. Generate a new key with the AI Agent scope in ForgePt Settings." } }), { status: 403, headers: { ...CORS, "Content-Type": "application/json" } })
   }
 
-  const orgId: string = keyRow.org_id
+  const orgId: string  = keyRow.org_id
   const userId: string | null = keyRow.user_id || null
 
-  // Fire-and-forget last_used update
-  supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id)
+  sb.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id)
 
-  // Parse JSON-RPC
   let body: any
   try { body = await req.json() } catch {
     return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } })
@@ -856,7 +966,6 @@ Deno.serve(async (req) => {
     { headers: { ...CORS, "Content-Type": "application/json" } }
   )
 
-  // notifications have no id and need no response body
   if (method?.startsWith("notifications/")) {
     return new Response(null, { status: 202, headers: CORS })
   }
@@ -874,9 +983,9 @@ Deno.serve(async (req) => {
 
     case "tools/call": {
       const toolName: string = params?.name
-      const toolInput: any = params?.arguments || {}
+      const toolInput: any   = params?.arguments || {}
       if (!toolName) return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32602, message: "Missing tool name" } }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } })
-      const result = await executeTool(toolName, toolInput, supabase, orgId, userId)
+      const result = await executeTool(toolName, toolInput, sb, orgId, userId)
       return ok({ content: [{ type: "text", text: JSON.stringify(result, null, 2) }] })
     }
 
