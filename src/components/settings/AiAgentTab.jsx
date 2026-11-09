@@ -167,9 +167,10 @@ export default function AiAgentTab({ featureApi }) {
       )}
 
       {/* Setup instructions */}
-      <div className="bg-fp-inset border border-fp-border rounded-xl p-5 space-y-4">
-        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Setup instructions</p>
+      <div className="bg-fp-inset border border-fp-border rounded-xl p-5 space-y-5">
+        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">How to connect</p>
 
+        {/* Server URL */}
         <div>
           <p className="text-fp-text text-sm font-semibold mb-1">Server URL</p>
           <div className="flex items-center gap-2">
@@ -180,7 +181,35 @@ export default function AiAgentTab({ featureApi }) {
           </div>
         </div>
 
+        {/* Claude Desktop — recommended */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <p className="text-fp-text text-sm font-semibold">Claude Desktop</p>
+            <span className="text-xs bg-fp-brand/10 text-fp-brand px-2 py-0.5 rounded-full font-medium">Recommended</span>
+          </div>
+          <ol className="space-y-1.5 list-none">
+            {[
+              'Open Claude Desktop → Settings → Connectors',
+              'Click + Add and paste the Server URL above',
+              'Select "Register automatically" under OAuth client',
+              'Click Add — you\'ll be redirected to sign in to ForgePt',
+              'Click Allow Access — your agent is connected',
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-fp-muted text-xs">
+                <span className="text-fp-brand font-semibold shrink-0 w-4">{i + 1}.</span>
+                {step}
+              </li>
+            ))}
+          </ol>
+          <p className="text-fp-muted text-xs pt-1">No key needed — the OAuth flow handles authentication automatically.</p>
+        </div>
+
+        <div className="border-t border-fp-border" />
+
+        {/* API key fallback */}
         <div className="space-y-3">
+          <p className="text-fp-text text-xs font-semibold text-fp-muted uppercase tracking-wide">API key method (alternative)</p>
+          <p className="text-fp-muted text-xs">Generate a key above, then use it with any MCP-compatible client.</p>
           {[
             {
               platform: 'Claude Desktop',
@@ -203,9 +232,8 @@ export default function AiAgentTab({ featureApi }) {
               <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre border border-fp-border">{p.code}</pre>
             </div>
           ))}
+          <p className="text-fp-muted text-xs">Replace <code className="text-fp-brand font-mono bg-fp-card px-1 rounded">fpk_your_key_here</code> with your generated key.</p>
         </div>
-
-        <p className="text-fp-muted text-xs">Replace <code className="text-fp-brand font-mono bg-fp-card px-1 rounded">fpk_your_key_here</code> with the key you generate above. Each person on your team should generate their own key so actions are attributed to the right rep.</p>
       </div>
 
     </div>
