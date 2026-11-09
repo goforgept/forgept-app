@@ -63,6 +63,7 @@ export default function ApiTab({ featureApi }) {
       .filter(Boolean)
     const { error } = await supabase.from('api_keys').insert({
       org_id:          profile.org_id,
+      user_id:         profile.id,
       name:            form.name.trim(),
       key_prefix:      prefix,
       key_hash:        hash,
