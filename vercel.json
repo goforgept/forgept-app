@@ -1,8 +1,17 @@
 {
   "rewrites": [
+    { "source": "/api/mcp/:path*", "destination": "https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [

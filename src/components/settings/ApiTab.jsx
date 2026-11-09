@@ -11,7 +11,7 @@ const SCOPES = [
   { value: 'embed:designer',  label: 'Designer (embed)',   desc: 'Embed the interactive designer in your own platform' },
 ]
 
-const MCP_SERVER_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server'
+const MCP_SERVER_URL = 'https://app.goforgept.com/api/mcp'
 
 async function sha256hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))

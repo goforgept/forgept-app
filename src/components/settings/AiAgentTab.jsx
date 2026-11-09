@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
-const MCP_SERVER_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server'
+const MCP_SERVER_URL = 'https://app.goforgept.com/api/mcp'
 
 async function sha256hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))

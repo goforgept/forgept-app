@@ -7,7 +7,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
-const MCP_BASE_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server'
+const MCP_BASE_URL = 'https://app.goforgept.com/api/mcp'
 const APP_URL      = 'https://app.goforgept.com'
 
 async function sha256hex(str: string): Promise<string> {
@@ -931,7 +931,18 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization") || ""
   const rawKey = authHeader.replace(/^Bearer\s+/i, "").trim()
   if (!rawKey) {
-    return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Missing API key" } }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } })
+    return new Response(
+      JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Missing API key" } }),
+      {
+        status: 401,
+        headers: {
+          ...CORS,
+          "Content-Type": "application/json",
+          "WWW-Authenticate": `Bearer realm="ForgePt MCP", scope="agent:mcp"`,
+          "Link": `<${MCP_BASE_URL}/.well-known/oauth-authorization-server>; rel="oauth-authorization-server"`,
+        },
+      }
+    )
   }
 
   const keyHash = await sha256hex(rawKey)
