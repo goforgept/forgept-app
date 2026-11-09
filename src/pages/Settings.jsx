@@ -15,6 +15,7 @@ import DesignerTab from '../components/settings/DesignerTab'
 import EmailTemplatesTab from '../components/settings/EmailTemplatesTab'
 import TeamSettingsTab from '../components/settings/TeamSettingsTab'
 import ApiTab from '../components/settings/ApiTab'
+import AiAgentTab from '../components/settings/AiAgentTab'
 import RegionsTab from '../components/settings/RegionsTab'
 import GlobalProductsImport from '../components/GlobalProductsImport'
 
@@ -572,6 +573,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       { key: 'general', label: 'General' },
       ...(!isTechnician ? [{ key: 'proposals', label: 'Proposals' }] : []),
       { key: 'security', label: 'Security' },
+      ...(featureApi ? [{ key: 'ai-agent', label: 'AI Agent' }] : []),
     ] },
     ...(isAdmin && !featureDesignerOnly ? [{
       label: 'Admin',
@@ -737,6 +739,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
           {activeTab === 'regions' && isAdmin && <RegionsTab regionsEnabled={regionsEnabled} setRegionsEnabled={setRegionsEnabled} />}
           {activeTab === 'api' && (isAdmin || isDevTeam) && <ApiTab featureApi={featureApi} />}
+          {activeTab === 'ai-agent' && <AiAgentTab featureApi={featureApi} />}
 
           {activeTab === 'catalog' && isDevTeam && !isAdmin && (
             <div className="p-6">
