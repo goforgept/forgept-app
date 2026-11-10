@@ -41,6 +41,7 @@ export default function BomSection({
   onApplyBulkEdit,
   onUpdateLabor,
   onUpdateSectionLabor,
+  onUpdateSectionFields,
   onAddSectionLaborLine,
   onRemoveSectionLaborLine,
   onExcelUpload,
@@ -1387,20 +1388,77 @@ export default function BomSection({
                           <button onClick={() => onAddSectionLaborLine(section.id)} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">+ Add Labor</button>
                         </div>
                       )}
+                      {/* Section Shipping */}
+                      <div className="mt-3 pt-3 border-t border-fp-border/50">
+                        {(section._shipping_open || section.shipping_fee != null) ? (
+                          <>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Section Shipping</p>
+                              <button onClick={() => onUpdateSectionFields(section.id, { _shipping_open: false, shipping_fee: null, shipping_your_cost: null, shipping_description: null, _shipping_markup: undefined })} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                              <div className="col-span-2 sm:col-span-1">
+                                <p className="text-fp-muted text-xs mb-1">Description</p>
+                                <input type="text" value={section.shipping_description || ''} placeholder="Shipping & Handling"
+                                  onChange={e => onUpdateSectionFields(section.id, { shipping_description: e.target.value })}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Your Cost</p>
+                                <input type="number" min="0" step="0.01" value={section.shipping_your_cost ?? ''}
+                                  onChange={e => {
+                                    const cost = parseFloat(e.target.value) || 0
+                                    const markup = parseFloat(section._shipping_markup ?? defaultMarkup ?? 35)
+                                    const price = cost > 0 ? parseFloat((cost * (1 + markup / 100)).toFixed(2)) : null
+                                    onUpdateSectionFields(section.id, { shipping_your_cost: e.target.value === '' ? null : parseFloat(e.target.value) || 0, shipping_fee: price })
+                                  }}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Markup %</p>
+                                <input type="number" min="0" step="0.1"
+                                  value={section._shipping_markup ?? (parseFloat(section.shipping_your_cost) > 0 && parseFloat(section.shipping_fee) > 0 ? ((parseFloat(section.shipping_fee) / parseFloat(section.shipping_your_cost) - 1) * 100).toFixed(1) : String(defaultMarkup || 35))}
+                                  onChange={e => {
+                                    const cost = parseFloat(section.shipping_your_cost) || 0
+                                    const markup = parseFloat(e.target.value) || 0
+                                    const price = cost > 0 ? parseFloat((cost * (1 + markup / 100)).toFixed(2)) : null
+                                    onUpdateSectionFields(section.id, { _shipping_markup: e.target.value, shipping_fee: price })
+                                  }}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Customer Price</p>
+                                <input type="number" min="0" step="0.01" value={section.shipping_fee ?? ''}
+                                  onChange={e => {
+                                    const price = parseFloat(e.target.value) || 0
+                                    const cost = parseFloat(section.shipping_your_cost) || 0
+                                    const markup = cost > 0 && price > 0 ? String(((price / cost - 1) * 100).toFixed(1)) : (section._shipping_markup ?? String(defaultMarkup || 35))
+                                    onUpdateSectionFields(section.id, { shipping_fee: e.target.value === '' ? null : parseFloat(e.target.value) || 0, _shipping_markup: markup })
+                                  }}
+                                  className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <button onClick={() => onUpdateSectionFields(section.id, { _shipping_open: true, _shipping_markup: String(defaultMarkup || 35) })} className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping</button>
+                        )}
+                      </div>
                       {(() => {
                         const secLines = editLines.filter(l => l.section_id === section.id)
                         const secMat = secLines.reduce((s,l) => s+((parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0)),0)
                         const secLab = section.include_labor ? (section.labor_items||[]).reduce((s,l) => s+(parseFloat(l.customer_price)||0),0) : 0
+                        const secShip = parseFloat(section.shipping_fee) || 0
                         const secCostMat = secLines.reduce((s,l) => s+((parseFloat(l.your_cost_unit)||0)*(parseFloat(l.quantity)||0)),0)
                         const secCostLab = section.include_labor ? (section.labor_items||[]).reduce((s,l) => s+((parseFloat(l.your_cost)||0)*(parseFloat(l.quantity)||0)),0) : 0
-                        const secTotal = secMat + secLab
-                        const secCost = secCostMat + secCostLab
+                        const secTotal = secMat + secLab + secShip
+                        const secCost = secCostMat + secCostLab + (parseFloat(section.shipping_your_cost) || 0)
                         const secMargin = secTotal > 0 ? ((secTotal-secCost)/secTotal*100).toFixed(1) : '0.0'
                         return (
                           <div className="flex justify-between items-center mt-3 pt-3 border-t border-fp-border text-xs">
                             <div className="flex gap-4">
                               <span className="text-fp-muted">Materials: <span className="text-fp-text font-semibold">${secMat.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>
                               {section.include_labor && secLab > 0 && <span className="text-fp-muted">Labor: <span className="text-fp-text font-semibold">${secLab.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>}
+                              {secShip > 0 && <span className="text-fp-muted">Shipping: <span className="text-fp-text font-semibold">${secShip.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>}
                               <span className="text-fp-muted">Margin: <span className="text-[#C8622A] font-semibold">{secMargin}%</span></span>
                             </div>
                             <span className="text-fp-muted">Section Total: <span className="text-fp-text font-bold">${secTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>
@@ -1521,6 +1579,61 @@ export default function BomSection({
                           <button onClick={() => onAddSectionLaborLine(section.id)} className="mt-3 text-xs text-fp-brand hover:text-fp-text transition-colors">+ Add Labor Line</button>
                         </div>
                       )}
+                      {/* Section Shipping */}
+                      <div className="mt-3 pt-3 border-t border-fp-border/50">
+                        {(section._shipping_open || section.shipping_fee != null) ? (
+                          <>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Section Shipping</p>
+                              <button onClick={() => onUpdateSectionFields(section.id, { _shipping_open: false, shipping_fee: null, shipping_your_cost: null, shipping_description: null, _shipping_markup: undefined })} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                              <div className="col-span-2 sm:col-span-1">
+                                <p className="text-fp-muted text-xs mb-1">Description</p>
+                                <input type="text" value={section.shipping_description || ''} placeholder="Shipping & Handling"
+                                  onChange={e => onUpdateSectionFields(section.id, { shipping_description: e.target.value })}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Your Cost</p>
+                                <input type="number" min="0" step="0.01" value={section.shipping_your_cost ?? ''}
+                                  onChange={e => {
+                                    const cost = parseFloat(e.target.value) || 0
+                                    const markup = parseFloat(section._shipping_markup ?? defaultMarkup ?? 35)
+                                    const price = cost > 0 ? parseFloat((cost * (1 + markup / 100)).toFixed(2)) : null
+                                    onUpdateSectionFields(section.id, { shipping_your_cost: e.target.value === '' ? null : parseFloat(e.target.value) || 0, shipping_fee: price })
+                                  }}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Markup %</p>
+                                <input type="number" min="0" step="0.1"
+                                  value={section._shipping_markup ?? (parseFloat(section.shipping_your_cost) > 0 && parseFloat(section.shipping_fee) > 0 ? ((parseFloat(section.shipping_fee) / parseFloat(section.shipping_your_cost) - 1) * 100).toFixed(1) : String(defaultMarkup || 35))}
+                                  onChange={e => {
+                                    const cost = parseFloat(section.shipping_your_cost) || 0
+                                    const markup = parseFloat(e.target.value) || 0
+                                    const price = cost > 0 ? parseFloat((cost * (1 + markup / 100)).toFixed(2)) : null
+                                    onUpdateSectionFields(section.id, { _shipping_markup: e.target.value, shipping_fee: price })
+                                  }}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </div>
+                              <div>
+                                <p className="text-fp-muted text-xs mb-1">Customer Price</p>
+                                <input type="number" min="0" step="0.01" value={section.shipping_fee ?? ''}
+                                  onChange={e => {
+                                    const price = parseFloat(e.target.value) || 0
+                                    const cost = parseFloat(section.shipping_your_cost) || 0
+                                    const markup = cost > 0 && price > 0 ? String(((price / cost - 1) * 100).toFixed(1)) : (section._shipping_markup ?? String(defaultMarkup || 35))
+                                    onUpdateSectionFields(section.id, { shipping_fee: e.target.value === '' ? null : parseFloat(e.target.value) || 0, _shipping_markup: markup })
+                                  }}
+                                  className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <button onClick={() => onUpdateSectionFields(section.id, { _shipping_open: true, _shipping_markup: String(defaultMarkup || 35) })} className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping</button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1732,7 +1845,7 @@ export default function BomSection({
               const liveLaborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) + liveSecLaborTotal
               const liveTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
               const liveTaxAmount = liveBOMTotal * (liveTaxRate / 100)
-              const liveShipping = parseFloat(proposal?.shipping_fee) || 0
+              const liveShipping = (parseFloat(proposal?.shipping_fee) || 0) + editSections.reduce((sum, s) => sum + (parseFloat(s.shipping_fee) || 0), 0)
               const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount + liveShipping
               const liveRevenueForMargin = liveBOMTotal + liveLaborTotal  // exclude tax from margin calc
               const liveBOMCost = editLines.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)

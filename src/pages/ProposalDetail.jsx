@@ -1700,6 +1700,8 @@ export default function ProposalDetail({ isAdmin }) {
     const docxTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
     const docxTaxAmt = Math.round(matTotal * (docxTaxRate / 100) * 100) / 100
     const docxShippingFee = parseFloat(p?.shipping_fee) || 0
+    const docxSectionShipping = sections.reduce((sum, s) => sum + (parseFloat(s.shipping_fee) || 0), 0)
+    const docxTotalShipping = docxShippingFee + docxSectionShipping
 
     const docxCsl = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
     const children = [
@@ -1952,11 +1954,12 @@ export default function ProposalDetail({ isAdmin }) {
     // Unified summary — hidden in installer/lump-sum mode
     if (!isLumpSum) {
       const docxAllLaborTotal = docxAllLaborForLumpSum
-      const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt + docxShippingFee
+      const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt + docxTotalShipping
       children.push(
         new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
         ...(docxAllLaborTotal > 0 ? [new Paragraph({ children: [new TextRun({ text: `Labor Total: $${docxAllLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] })] : []),
         ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
+        ...sections.filter(s => parseFloat(s.shipping_fee) > 0).map(s => new Paragraph({ children: [new TextRun({ text: `${s.shipping_description || `Shipping — ${s.name}`}: $${parseFloat(s.shipping_fee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })),
         ...(docxShippingFee > 0 ? [new Paragraph({ children: [new TextRun({ text: `${p?.shipping_description || 'Shipping & Handling'}: $${docxShippingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
         new Paragraph({ children: [new TextRun({ text: `Grand Total: $${docxGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -2414,6 +2417,10 @@ export default function ProposalDetail({ isAdmin }) {
     setEditSections(prev => prev.map(s => s.id === sectionId ? { ...s, [field]: value } : s))
   }
 
+  const updateSectionFields = (sectionId, fields) => {
+    setEditSections(prev => prev.map(s => s.id === sectionId ? { ...s, ...fields } : s))
+  }
+
   const deleteSection = (sectionId) => {
     // Move all lines from this section to general (null section_id)
     setEditLines(prev => prev.map(l => l.section_id === sectionId ? { ...l, section_id: null } : l))
@@ -2742,6 +2749,7 @@ export default function ProposalDetail({ isAdmin }) {
           proposal_id: id, org_id: profile?.org_id, name: s.name || 'Untitled Section',
           sort_order: s.sort_order, include_labor: s.include_labor, labor_items: s.labor_items || [],
           proposal_location_id: resolvedLocId,
+          shipping_fee: s.shipping_fee ?? null, shipping_your_cost: s.shipping_your_cost ?? null, shipping_description: s.shipping_description ?? null,
         }).select().single()
         if (secInsertErr) { alert('Error saving section: ' + secInsertErr.message); setSaving(false); return }
         if (newSec) sectionIdMap[s.id] = newSec.id
@@ -2750,6 +2758,7 @@ export default function ProposalDetail({ isAdmin }) {
           name: s.name, sort_order: s.sort_order,
           include_labor: s.include_labor, labor_items: s.labor_items || [],
           proposal_location_id: resolvedLocId,
+          shipping_fee: s.shipping_fee ?? null, shipping_your_cost: s.shipping_your_cost ?? null, shipping_description: s.shipping_description ?? null,
         }).eq('id', s.id)
         if (secUpdateErr) { alert('Error updating section: ' + secUpdateErr.message); setSaving(false); return }
         sectionIdMap[s.id] = s.id
@@ -3851,7 +3860,9 @@ const analyzeDrawing = async () => {
     const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
     const allLaborTotal = proposalLaborTotal + sectionLaborTotal
     const pdfShippingFee = parseFloat(p?.shipping_fee) || 0
-    const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount + pdfShippingFee
+    const sectionShippingTotal = sections.reduce((sum, s) => sum + (parseFloat(s.shipping_fee) || 0), 0)
+    const totalShipping = pdfShippingFee + sectionShippingTotal
+    const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount + totalShipping
 
     if (p?.lump_sum_labor && proposalLaborTotal > 0 && pdfLaborItems.some(l => l.role)) {
       const generalLaborHours = pdfLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
@@ -3905,7 +3916,8 @@ const analyzeDrawing = async () => {
     // Grand total summary — hidden in installer/lump-sum mode and when there are no items
     if (!isLumpSum && (lineItems.length > 0 || allLaborTotal > 0)) {
       const pageHeight = doc.internal.pageSize.getHeight()
-      const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + (pdfShippingFee > 0 ? 7 : 0) + 12
+      const shippingLines = [...sections.filter(s => parseFloat(s.shipping_fee) > 0).map(s => ({ label: s.shipping_description || `Shipping — ${s.name}`, amt: parseFloat(s.shipping_fee) })), ...(pdfShippingFee > 0 ? [{ label: p?.shipping_description || 'Shipping & Handling', amt: pdfShippingFee }] : [])]
+      const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + shippingLines.length * 7 + 12
       if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
       const summaryX = pageWidth - 96
       doc.setDrawColor(200, 200, 200)
@@ -3925,9 +3937,9 @@ const analyzeDrawing = async () => {
         doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
         yPos += 7
       }
-      if (pdfShippingFee > 0) {
-        doc.text(`${p?.shipping_description || 'Shipping & Handling'}:`, summaryX, yPos)
-        doc.text(`$${pdfShippingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+      for (const sl of shippingLines) {
+        doc.text(`${sl.label}:`, summaryX, yPos)
+        doc.text(`$${sl.amt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
         yPos += 7
       }
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -4299,6 +4311,7 @@ const analyzeDrawing = async () => {
           onApplyBulkEdit={applyBulkEdit}
           onUpdateLabor={updateLabor}
           onUpdateSectionLabor={updateSectionLabor}
+          onUpdateSectionFields={updateSectionFields}
           onAddSectionLaborLine={addSectionLaborLine}
           laborRates={orgLaborRates}
           defaultMarkup={parseFloat(profile?.default_markup_percent) || 35}

@@ -112,10 +112,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setContractFees([])
     setIncludedContractFees({})
 
-    const { data: bomItems } = await supabase
-      .from('bom_line_items')
-      .select('*')
-      .eq('proposal_id', proposalId)
+    const [{ data: bomItems }, { data: proposalSections }] = await Promise.all([
+      supabase.from('bom_line_items').select('*').eq('proposal_id', proposalId),
+      supabase.from('proposal_sections').select('id, name, shipping_fee, shipping_your_cost, shipping_description, include_labor, labor_items').eq('proposal_id', proposalId),
+    ])
 
     if (prop) {
       setForm(prev => ({ ...prev, description: prop.job_description || prop.proposal_name || '' }))
@@ -142,6 +142,39 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
         total: parseFloat(l.customer_price) || 0
       })
     })
+
+    // Section labor
+    ;(proposalSections || []).filter(s => s.include_labor).forEach(s => {
+      ;(s.labor_items || []).filter(l => l.role).forEach(l => {
+        items.push({
+          description: `${l.role}${s.name ? ` — ${s.name}` : ''}`,
+          quantity: l.quantity || 1,
+          unit_price: parseFloat(l.customer_price) || 0,
+          total: parseFloat(l.customer_price) || 0
+        })
+      })
+    })
+
+    // Section shipping
+    ;(proposalSections || []).filter(s => parseFloat(s.shipping_fee) > 0).forEach(s => {
+      items.push({
+        description: s.shipping_description || `Shipping — ${s.name || 'Section'}`,
+        quantity: 1,
+        unit_price: parseFloat(s.shipping_fee),
+        total: parseFloat(s.shipping_fee)
+      })
+    })
+
+    // Proposal-level shipping
+    const propShipping = parseFloat(prop?.shipping_fee) || 0
+    if (propShipping > 0) {
+      items.push({
+        description: prop?.shipping_description || 'Shipping & Handling',
+        quantity: 1,
+        unit_price: propShipping,
+        total: propShipping
+      })
+    }
 
     // Load job for billing type, client terms, and change orders
     const { data: jobData } = await supabase
