@@ -1752,12 +1752,11 @@ export default function BomSection({
               )
             })()}
           </div>
-        </div>
 
-        {/* Bottom Save BOM button */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-fp-border mt-4">
-          <button onClick={onCancelEditing} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-          <button onClick={onSaveBOM} disabled={saving} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save BOM'}</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-fp-border mt-4">
+            <button onClick={onCancelEditing} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+            <button onClick={onSaveBOM} disabled={saving} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save BOM'}</button>
+          </div>
         </div>
       )}
     </div>
