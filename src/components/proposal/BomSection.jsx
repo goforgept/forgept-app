@@ -71,7 +71,25 @@ export default function BomSection({
   onCopyLocation,
   updateShipping,
 }) {
-  const [shippingOpen, setShippingOpen] = useState(() => !!(proposal?.shipping_fee || proposal?.shipping_description))
+  const [shippingOpen, setShippingOpen] = useState(false)
+  const [shippingFields, setShippingFields] = useState({ description: 'Shipping & Handling', cost: '', markup: String(defaultMarkup || 35), price: '' })
+
+  useEffect(() => {
+    const hasSaved = proposal?.shipping_fee != null || proposal?.shipping_description != null
+    if (hasSaved) {
+      setShippingOpen(true)
+      const cost = parseFloat(proposal?.shipping_your_cost) || 0
+      const price = parseFloat(proposal?.shipping_fee) || 0
+      const markup = cost > 0 && price > 0 ? ((price / cost - 1) * 100).toFixed(1) : String(defaultMarkup || 35)
+      setShippingFields({
+        description: proposal?.shipping_description || 'Shipping & Handling',
+        cost: cost > 0 ? String(cost) : '',
+        markup,
+        price: price > 0 ? String(price) : '',
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal?.shipping_fee, proposal?.shipping_your_cost, proposal?.shipping_description])
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [markupMode, setMarkupMode] = useState('markup') // 'markup' | 'gpm'
@@ -1642,45 +1660,69 @@ export default function BomSection({
           </div>
 
           {/* Shipping */}
-          {(shippingOpen || canEdit) && (() => {
-            const shippingFee = parseFloat(proposal?.shipping_fee) || 0
-            const shippingCost = parseFloat(proposal?.shipping_your_cost) || 0
-            const shippingGP = shippingFee > 0 && shippingCost > 0 ? ((shippingFee - shippingCost) / shippingFee * 100).toFixed(1) : null
-            return (
-              <div className="mt-4 border border-fp-border rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-fp-text text-sm font-semibold">Shipping</p>
-                  {shippingOpen && canEdit && (
-                    <button onClick={() => { setShippingOpen(false); updateShipping({ shipping_fee: null, shipping_your_cost: null, shipping_description: null }) }} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
-                  )}
-                </div>
-                {shippingOpen ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-fp-muted text-xs mb-1">Description</p>
-                      <input type="text" defaultValue={proposal?.shipping_description || 'Shipping & Handling'}
-                        onBlur={e => updateShipping({ shipping_description: e.target.value || 'Shipping & Handling' })}
-                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                    </div>
-                    <div>
-                      <p className="text-fp-muted text-xs mb-1">Customer Price</p>
-                      <input type="number" min="0" step="0.01" defaultValue={shippingFee || ''}
-                        onBlur={e => updateShipping({ shipping_fee: parseFloat(e.target.value) || null })}
-                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                    </div>
-                    <div>
-                      <p className="text-fp-muted text-xs mb-1">Your Cost {shippingGP != null && <span className="text-[#C8622A]">({shippingGP}% GP)</span>}</p>
-                      <input type="number" min="0" step="0.01" defaultValue={shippingCost || ''}
-                        onBlur={e => updateShipping({ shipping_your_cost: parseFloat(e.target.value) || null })}
-                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                    </div>
-                  </div>
-                ) : canEdit ? (
-                  <button onClick={() => setShippingOpen(true)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping Fee</button>
-                ) : null}
+          {canEdit && (
+            <div className="mt-4 border border-fp-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-fp-text text-sm font-semibold">Shipping</p>
+                {shippingOpen && (
+                  <button onClick={() => {
+                    setShippingOpen(false)
+                    setShippingFields({ description: 'Shipping & Handling', cost: '', markup: String(defaultMarkup || 35), price: '' })
+                    updateShipping({ shipping_fee: null, shipping_your_cost: null, shipping_description: null })
+                  }} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
+                )}
               </div>
-            )
-          })()}
+              {shippingOpen ? (
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="col-span-4 sm:col-span-1">
+                    <p className="text-fp-muted text-xs mb-1">Description</p>
+                    <input type="text" value={shippingFields.description}
+                      onChange={e => setShippingFields(f => ({ ...f, description: e.target.value }))}
+                      onBlur={() => updateShipping({ shipping_description: shippingFields.description || 'Shipping & Handling' })}
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                  </div>
+                  <div>
+                    <p className="text-fp-muted text-xs mb-1">Your Cost</p>
+                    <input type="number" min="0" step="0.01" value={shippingFields.cost}
+                      onChange={e => {
+                        const cost = parseFloat(e.target.value) || 0
+                        const markup = parseFloat(shippingFields.markup) || (defaultMarkup || 35)
+                        const price = cost > 0 ? (cost * (1 + markup / 100)).toFixed(2) : ''
+                        setShippingFields(f => ({ ...f, cost: e.target.value, price }))
+                      }}
+                      onBlur={() => updateShipping({ shipping_your_cost: parseFloat(shippingFields.cost) || null, shipping_fee: parseFloat(shippingFields.price) || null })}
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                  </div>
+                  <div>
+                    <p className="text-fp-muted text-xs mb-1">Markup %</p>
+                    <input type="number" min="0" step="0.1" value={shippingFields.markup}
+                      onChange={e => {
+                        const cost = parseFloat(shippingFields.cost) || 0
+                        const markup = parseFloat(e.target.value) || 0
+                        const price = cost > 0 ? (cost * (1 + markup / 100)).toFixed(2) : ''
+                        setShippingFields(f => ({ ...f, markup: e.target.value, price }))
+                      }}
+                      onBlur={() => updateShipping({ shipping_fee: parseFloat(shippingFields.price) || null })}
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                  </div>
+                  <div>
+                    <p className="text-fp-muted text-xs mb-1">Customer Price</p>
+                    <input type="number" min="0" step="0.01" value={shippingFields.price}
+                      onChange={e => {
+                        const price = parseFloat(e.target.value) || 0
+                        const cost = parseFloat(shippingFields.cost) || 0
+                        const markup = cost > 0 && price > 0 ? ((price / cost - 1) * 100).toFixed(1) : shippingFields.markup
+                        setShippingFields(f => ({ ...f, price: e.target.value, markup }))
+                      }}
+                      onBlur={() => updateShipping({ shipping_fee: parseFloat(shippingFields.price) || null, shipping_your_cost: parseFloat(shippingFields.cost) || null })}
+                      className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand font-semibold" />
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setShippingOpen(true)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping Fee</button>
+              )}
+            </div>
+          )}
 
           {/* Live running total */}
           <div className="mt-6 border-t border-fp-border pt-4 space-y-2">
@@ -1710,6 +1752,12 @@ export default function BomSection({
               )
             })()}
           </div>
+        </div>
+
+        {/* Bottom Save BOM button */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-fp-border mt-4">
+          <button onClick={onCancelEditing} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+          <button onClick={onSaveBOM} disabled={saving} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save BOM'}</button>
         </div>
       )}
     </div>
