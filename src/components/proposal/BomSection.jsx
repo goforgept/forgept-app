@@ -69,6 +69,7 @@ export default function BomSection({
   onDeleteProposalLocation,
   onDuplicateSection,
   onCopyLocation,
+  updateShipping,
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -821,12 +822,14 @@ export default function BomSection({
                   {(() => {
                     const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
                     const allLaborTotal = laborTotal + sectionLaborTotal
-                    const adjustedGrandTotal = materialsTotal + allLaborTotal + taxAmount
+                    const shippingFeeView = parseFloat(proposal?.shipping_fee) || 0
+                    const adjustedGrandTotal = materialsTotal + allLaborTotal + taxAmount + shippingFeeView
                     return (
                       <div className="border-t border-fp-border pt-4 mt-4 space-y-1.5">
                         <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Materials Total</span><span className="text-fp-text font-bold">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         {allLaborTotal > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Labor Total</span><span className="text-fp-text font-bold">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
                         {taxRate > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">Tax ({taxRate}% on materials)</span><span className="text-fp-text font-bold">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                        {shippingFeeView > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted font-semibold">{proposal?.shipping_description || 'Shipping & Handling'}</span><span className="text-fp-text font-bold">${shippingFeeView.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
                         <div className="flex justify-between border-t border-fp-border pt-2 mt-1"><span className="text-fp-muted font-semibold">Grand Total</span><span className="text-[#C8622A] font-bold text-lg">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                       </div>
                     )
@@ -1637,6 +1640,49 @@ export default function BomSection({
             <button onClick={() => setLaborItems(prev => [...prev, { role: '', quantity: '', unit: 'hr', your_cost: '', markup: defaultMarkup, customer_price: 0 }])} className="mt-4 hidden lg:block text-[#C8622A] hover:text-fp-text text-sm transition-colors">+ Add Labor</button>
           </div>
 
+          {/* Shipping */}
+          {(() => {
+            const shippingFee = parseFloat(proposal?.shipping_fee) || 0
+            const shippingCost = parseFloat(proposal?.shipping_your_cost) || 0
+            const shippingGP = shippingFee > 0 ? ((shippingFee - shippingCost) / shippingFee * 100).toFixed(1) : null
+            if (!shippingFee && !canEdit) return null
+            return (
+              <div className="mt-4 border border-fp-border rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-fp-text text-sm font-semibold">Shipping</p>
+                  {shippingFee > 0 && canEdit && (
+                    <button onClick={() => updateShipping({ shipping_fee: null, shipping_your_cost: null, shipping_description: null })} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
+                  )}
+                </div>
+                {shippingFee > 0 ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-fp-muted text-xs mb-1">Description</p>
+                      <input type="text" defaultValue={proposal?.shipping_description || 'Shipping & Handling'}
+                        onBlur={e => updateShipping({ shipping_description: e.target.value || 'Shipping & Handling' })}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                    </div>
+                    <div>
+                      <p className="text-fp-muted text-xs mb-1">Customer Price</p>
+                      <input type="number" min="0" step="0.01" defaultValue={shippingFee || ''}
+                        onBlur={e => updateShipping({ shipping_fee: parseFloat(e.target.value) || null })}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                    </div>
+                    <div>
+                      <p className="text-fp-muted text-xs mb-1">Your Cost {shippingGP != null && <span className="text-[#C8622A]">({shippingGP}% GP)</span>}</p>
+                      <input type="number" min="0" step="0.01" defaultValue={shippingCost || ''}
+                        onBlur={e => updateShipping({ shipping_your_cost: parseFloat(e.target.value) || null })}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                    </div>
+                  </div>
+                ) : canEdit ? (
+                  <button onClick={() => updateShipping({ shipping_fee: 0, shipping_your_cost: 0, shipping_description: 'Shipping & Handling' })}
+                    className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping Fee</button>
+                ) : null}
+              </div>
+            )
+          })()}
+
           {/* Live running total */}
           <div className="mt-6 border-t border-fp-border pt-4 space-y-2">
             {(() => {
@@ -1645,7 +1691,8 @@ export default function BomSection({
               const liveLaborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) + liveSecLaborTotal
               const liveTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
               const liveTaxAmount = liveBOMTotal * (liveTaxRate / 100)
-              const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount
+              const liveShipping = parseFloat(proposal?.shipping_fee) || 0
+              const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount + liveShipping
               const liveRevenueForMargin = liveBOMTotal + liveLaborTotal  // exclude tax from margin calc
               const liveBOMCost = editLines.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
               const liveSecLaborCost = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) : 0), 0)
@@ -1657,6 +1704,7 @@ export default function BomSection({
                   <div className="flex justify-between text-sm"><span className="text-fp-muted">Materials</span><span className="text-fp-text">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-fp-muted">Labor</span><span className="text-fp-text">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   {liveTaxRate > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted">Tax ({liveTaxRate}% on materials)</span><span className="text-fp-text">${liveTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                  {liveShipping > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted">{proposal?.shipping_description || 'Shipping'}</span><span className="text-fp-text">${liveShipping.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
                   <div className="flex justify-between text-base font-bold border-t border-fp-border pt-2"><span className="text-fp-text">Grand Total</span><span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-fp-muted">Gross Margin</span><span className="text-[#C8622A] font-semibold">{liveMargin}%</span></div>
                 </>

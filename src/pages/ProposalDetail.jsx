@@ -791,6 +791,11 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(prev => ({ ...prev, tax_exempt: val, tax_rate: val ? null : prev?.tax_rate }))
   }
 
+  const updateShipping = async (fields) => {
+    await supabase.from('proposals').update(fields).eq('id', id)
+    setProposal(prev => ({ ...prev, ...fields }))
+  }
+
   const updateIndustry = async (val) => {
     await supabase.from('proposals').update({ industry: val || null }).eq('id', id)
     setProposal(prev => ({ ...prev, industry: val || null }))
@@ -1694,6 +1699,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     const docxTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
     const docxTaxAmt = Math.round(matTotal * (docxTaxRate / 100) * 100) / 100
+    const docxShippingFee = parseFloat(p?.shipping_fee) || 0
 
     const docxCsl = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
     const children = [
@@ -1946,11 +1952,12 @@ export default function ProposalDetail({ isAdmin }) {
     // Unified summary — hidden in installer/lump-sum mode
     if (!isLumpSum) {
       const docxAllLaborTotal = docxAllLaborForLumpSum
-      const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
+      const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt + docxShippingFee
       children.push(
         new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
         ...(docxAllLaborTotal > 0 ? [new Paragraph({ children: [new TextRun({ text: `Labor Total: $${docxAllLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] })] : []),
         ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
+        ...(docxShippingFee > 0 ? [new Paragraph({ children: [new TextRun({ text: `${p?.shipping_description || 'Shipping & Handling'}: $${docxShippingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
         new Paragraph({ children: [new TextRun({ text: `Grand Total: $${docxGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
@@ -3843,7 +3850,8 @@ const analyzeDrawing = async () => {
     const proposalLaborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
     const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
     const allLaborTotal = proposalLaborTotal + sectionLaborTotal
-    const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
+    const pdfShippingFee = parseFloat(p?.shipping_fee) || 0
+    const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount + pdfShippingFee
 
     if (p?.lump_sum_labor && proposalLaborTotal > 0 && pdfLaborItems.some(l => l.role)) {
       const generalLaborHours = pdfLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
@@ -3897,7 +3905,7 @@ const analyzeDrawing = async () => {
     // Grand total summary — hidden in installer/lump-sum mode and when there are no items
     if (!isLumpSum && (lineItems.length > 0 || allLaborTotal > 0)) {
       const pageHeight = doc.internal.pageSize.getHeight()
-      const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + 12
+      const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + (pdfShippingFee > 0 ? 7 : 0) + 12
       if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
       const summaryX = pageWidth - 96
       doc.setDrawColor(200, 200, 200)
@@ -3915,6 +3923,11 @@ const analyzeDrawing = async () => {
       if (pdfTaxRate > 0) {
         doc.text(`Tax (${pdfTaxRate}% on materials):`, summaryX, yPos)
         doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+        yPos += 7
+      }
+      if (pdfShippingFee > 0) {
+        doc.text(`${p?.shipping_description || 'Shipping & Handling'}:`, summaryX, yPos)
+        doc.text(`$${pdfShippingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
         yPos += 7
       }
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -4312,6 +4325,7 @@ const analyzeDrawing = async () => {
           onDeleteProposalLocation={deleteProposalLocation}
           onDuplicateSection={duplicateSection}
           onCopyLocation={copyLocation}
+          updateShipping={updateShipping}
         />}
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />

@@ -81,12 +81,13 @@ const TOOLS = [
   },
   {
     name: "search_proposals",
-    description: "Search proposals by client name, proposal name, or status",
+    description: "Search proposals by client name, proposal name, status, or pipeline stage",
     inputSchema: {
       type: "object",
       properties: {
         query: { type: "string", description: "Search term — company name, proposal name, or rep name" },
-        status: { type: "string", description: "Filter by status: Draft, Sent, Won, Lost" },
+        status: { type: "string", description: "Filter by proposal status: Draft, Sent, Won, Lost" },
+        stage: { type: "string", description: "Filter by pipeline stage name, e.g. Lead, Qualified, Proposal Sent" },
       },
       required: [],
     },
@@ -143,22 +144,58 @@ const TOOLS = [
   },
   {
     name: "add_bom_item",
-    description: "Add a product or line item to a proposal section's BOM. Use this after searching for a product (from ForgePt catalog or an external source like Brivo) to add it to a proposal.",
+    description: "Add a single product or line item to a proposal BOM. For adding multiple items at once (e.g. a full BOM from a drawing or external source like Brivo), use add_bom_items instead.",
     inputSchema: {
       type: "object",
       properties: {
         proposal_name: { type: "string", description: "Name of the proposal to add the item to" },
         company: { type: "string", description: "Client company (used if proposal_name not known)" },
-        section_name: { type: "string", description: "Section name to add to (e.g. 'Access Control', 'Cameras'). If not found, item goes in the first section." },
+        section_name: { type: "string", description: "Section name (e.g. 'Access Control', 'Cameras'). Created if it doesn't exist." },
         item_name: { type: "string", description: "Product name or description" },
-        part_number: { type: "string", description: "Manufacturer part number (optional)" },
-        manufacturer: { type: "string", description: "Manufacturer name (optional)" },
-        quantity: { type: "number", description: "Quantity to add (default 1)" },
-        your_cost: { type: "number", description: "Your cost per unit in dollars (optional)" },
-        customer_price: { type: "number", description: "Customer price per unit in dollars (optional)" },
-        notes: { type: "string", description: "Line item notes (optional)" },
+        part_number: { type: "string", description: "Manufacturer part number" },
+        manufacturer: { type: "string", description: "Manufacturer name" },
+        category: { type: "string", description: "Product category" },
+        quantity: { type: "number", description: "Quantity (default 1)" },
+        unit: { type: "string", description: "Unit of measure, e.g. 'ea', 'ft' (default 'ea')" },
+        your_cost: { type: "number", description: "Your dealer cost per unit" },
+        customer_price: { type: "number", description: "Customer sell price per unit" },
+        msrp: { type: "number", description: "Manufacturer suggested retail price (MSRP) per unit" },
+        notes: { type: "string", description: "Line item notes" },
       },
       required: ["item_name"],
+    },
+  },
+  {
+    name: "add_bom_items",
+    description: "Add multiple items to a proposal BOM in one call. Supports three sources: (1) items from an external MCP like Brivo with their own pricing, (2) raw items with no pricing yet, (3) items looked up from the ForgePt product library. Each item can target a different section.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string", description: "Name of the proposal" },
+        company: { type: "string", description: "Client company (used if proposal_name not known)" },
+        items: {
+          type: "array",
+          description: "Array of items to add",
+          items: {
+            type: "object",
+            properties: {
+              item_name: { type: "string", description: "Product name or description" },
+              part_number: { type: "string", description: "Manufacturer part number" },
+              manufacturer: { type: "string", description: "Manufacturer name (e.g. 'Brivo', 'Axis')" },
+              category: { type: "string", description: "Product category (e.g. 'Access Control', 'Camera')" },
+              quantity: { type: "number", description: "Quantity" },
+              unit: { type: "string", description: "Unit of measure, e.g. 'ea', 'ft'" },
+              section_name: { type: "string", description: "Section to add this item to. Created if it doesn't exist." },
+              your_cost: { type: "number", description: "Your dealer cost per unit (from external source or manual)" },
+              customer_price: { type: "number", description: "Customer sell price per unit" },
+              msrp: { type: "number", description: "MSRP per unit (pass through from manufacturer MCP)" },
+              notes: { type: "string" },
+            },
+            required: ["item_name", "quantity"],
+          },
+        },
+      },
+      required: ["items"],
     },
   },
   {
@@ -293,6 +330,30 @@ const TOOLS = [
   },
 ]
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: string, sectionName: string | null): Promise<string | null> {
+  if (sectionName) {
+    const { data: sec } = await supabase.from("proposal_sections")
+      .select("id").eq("proposal_id", proposalId).ilike("name", `%${sectionName}%`).limit(1).maybeSingle()
+    if (sec) return sec.id
+    // Create named section
+    const { data: newSec } = await supabase.from("proposal_sections").insert({
+      proposal_id: proposalId, org_id: orgId, name: sectionName, order_index: 999,
+    }).select("id").single()
+    return newSec?.id || null
+  }
+  // Fall back to first existing section
+  const { data: firstSec } = await supabase.from("proposal_sections")
+    .select("id").eq("proposal_id", proposalId).order("order_index").limit(1).maybeSingle()
+  if (firstSec) return firstSec.id
+  // Create a default section
+  const { data: newSec } = await supabase.from("proposal_sections").insert({
+    proposal_id: proposalId, org_id: orgId, name: "Products", order_index: 0,
+  }).select("id").single()
+  return newSec?.id || null
+}
+
 // ─── Tool execution ───────────────────────────────────────────────────────────
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string | null): Promise<any> {
@@ -363,15 +424,24 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
 
     case "search_proposals": {
       let query = supabase.from("proposals")
-        .select("id, proposal_name, company, client_name, status, proposal_value, created_at, quote_expires_at")
-        .eq("org_id", orgId).order("created_at", { ascending: false }).limit(8)
+        .select("id, proposal_name, company, client_name, status, proposal_value, created_at, quote_expires_at, pipeline_stages(name)")
+        .eq("org_id", orgId).order("created_at", { ascending: false }).limit(25)
       if (input.status) query = query.ilike("status", `%${input.status}%`)
       if (input.query) {
         const q = `%${input.query}%`
         query = query.or(`proposal_name.ilike.${q},company.ilike.${q},client_name.ilike.${q}`)
       }
       const { data } = await query
-      return { results: data || [] }
+      const results = (data || []).map((p: any) => ({
+        ...p,
+        pipeline_stage: p.pipeline_stages?.name || null,
+        pipeline_stages: undefined,
+      }))
+      if (input.stage) {
+        const stageFilter = input.stage.toLowerCase()
+        return { results: results.filter((p: any) => p.pipeline_stage?.toLowerCase().includes(stageFilter)) }
+      }
+      return { results }
     }
 
     case "get_proposal_bom": {
@@ -394,14 +464,16 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         .select("id, name, include_labor")
         .eq("proposal_id", proposal.id).order("order_index")
 
-      const { data: items } = await supabase.from("proposal_items")
-        .select("id, section_id, item_name, part_number, manufacturer, quantity, your_cost, customer_price, notes, category")
-        .eq("proposal_id", proposal.id)
+      const { data: items } = await supabase.from("bom_line_items")
+        .select("id, section_id, item_name, manufacturer, part_number_sku, quantity, unit, category, your_cost_unit, customer_price_unit, customer_price_total, msrp_unit, pricing_status, notes, source")
+        .eq("proposal_id", proposal.id).order("sort_order", { ascending: true })
 
       const sectionMap: Record<string, any[]> = {}
+      const unsectioned: any[] = []
       for (const s of (sections || [])) sectionMap[s.id] = []
       for (const item of (items || [])) {
         if (item.section_id && sectionMap[item.section_id]) sectionMap[item.section_id].push(item)
+        else unsectioned.push(item)
       }
 
       return {
@@ -415,11 +487,14 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         sections: (sections || []).map(s => ({
           id: s.id, name: s.name, include_labor: s.include_labor,
           items: (sectionMap[s.id] || []).map(i => ({
-            id: i.id, name: i.item_name, part_number: i.part_number, manufacturer: i.manufacturer,
-            qty: i.quantity, your_cost: i.your_cost, customer_price: i.customer_price,
-            category: i.category, notes: i.notes,
+            id: i.id, name: i.item_name, part_number: i.part_number_sku, manufacturer: i.manufacturer,
+            qty: i.quantity, unit: i.unit || 'ea',
+            your_cost: i.your_cost_unit, customer_price: i.customer_price_unit,
+            customer_total: i.customer_price_total, msrp: i.msrp_unit,
+            pricing_status: i.pricing_status, category: i.category, notes: i.notes,
           })),
         })),
+        ...(unsectioned.length > 0 ? { unsectioned_items: unsectioned.map(i => ({ id: i.id, name: i.item_name, qty: i.quantity })) } : {}),
       }
     }
 
@@ -497,7 +572,6 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     }
 
     case "add_bom_item": {
-      // Find proposal
       let proposal: any = null
       if (input.proposal_name) {
         const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
@@ -511,41 +585,90 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       }
       if (!proposal) return { error: "No matching proposal found. Provide proposal_name or company." }
 
-      // Find or use first section
-      let sectionId: string | null = null
-      if (input.section_name) {
-        const { data: sec } = await supabase.from("proposal_sections")
-          .select("id").eq("proposal_id", proposal.id).ilike("name", `%${input.section_name}%`).limit(1).maybeSingle()
-        sectionId = sec?.id || null
-      }
-      if (!sectionId) {
-        const { data: firstSec } = await supabase.from("proposal_sections")
-          .select("id").eq("proposal_id", proposal.id).order("order_index").limit(1).maybeSingle()
-        sectionId = firstSec?.id || null
-      }
-      if (!sectionId) {
-        // Create a default section
-        const { data: newSec } = await supabase.from("proposal_sections").insert({
-          proposal_id: proposal.id, org_id: orgId, name: input.section_name || "Products", order_index: 0,
-        }).select("id").single()
-        sectionId = newSec?.id || null
-      }
+      const sectionId = await resolveOrCreateSection(supabase, proposal.id, orgId, input.section_name)
       if (!sectionId) return { error: "Could not find or create a section in this proposal." }
 
-      const { data: item, error } = await supabase.from("proposal_items").insert({
-        proposal_id: proposal.id,
-        section_id: sectionId,
-        org_id: orgId,
-        item_name: input.item_name,
-        part_number: input.part_number || null,
-        manufacturer: input.manufacturer || null,
-        quantity: input.quantity ?? 1,
-        your_cost: input.your_cost ?? null,
-        customer_price: input.customer_price ?? null,
-        notes: input.notes || null,
+      const qty = input.quantity ?? 1
+      const cost = input.your_cost ?? null
+      const price = input.customer_price ?? null
+      const { data: item, error } = await supabase.from("bom_line_items").insert({
+        proposal_id: proposal.id, section_id: sectionId, org_id: orgId, source: "agent",
+        item_name: input.item_name, part_number_sku: input.part_number || null,
+        manufacturer: input.manufacturer || null, category: input.category || null,
+        quantity: qty, unit: input.unit || "ea",
+        your_cost_unit: cost, customer_price_unit: price,
+        customer_price_total: price != null ? price * qty : null,
+        msrp_unit: input.msrp ?? null,
+        markup_percent: cost && price ? Math.round(((price - cost) / cost) * 100) : null,
+        pricing_status: cost != null ? "Confirmed" : "Needs Pricing",
+        notes: input.notes || null, sort_order: 9999,
       }).select("id, item_name, quantity").single()
       if (error) return { error: error.message }
       return { success: true, id: item.id, item_name: item.item_name, quantity: item.quantity, proposal_name: proposal.proposal_name, action: "added_bom_item" }
+    }
+
+    case "add_bom_items": {
+      let proposal: any = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found. Provide proposal_name or company." }
+
+      const items: any[] = input.items || []
+      if (items.length === 0) return { error: "No items provided." }
+
+      // Pre-resolve/create all unique sections in one pass
+      const sectionCache: Record<string, string | null> = {}
+      const uniqueSectionNames = [...new Set(items.map((i: any) => i.section_name || null))]
+      for (const name of uniqueSectionNames) {
+        sectionCache[String(name)] = await resolveOrCreateSection(supabase, proposal.id, orgId, name)
+      }
+
+      const rows = items.map((item: any, idx: number) => {
+        const qty = item.quantity ?? 1
+        const cost = item.your_cost ?? null
+        const price = item.customer_price ?? null
+        return {
+          proposal_id: proposal.id,
+          section_id: sectionCache[String(item.section_name || null)] || null,
+          org_id: orgId,
+          source: "agent",
+          item_name: item.item_name,
+          part_number_sku: item.part_number || null,
+          manufacturer: item.manufacturer || null,
+          category: item.category || null,
+          quantity: qty,
+          unit: item.unit || "ea",
+          your_cost_unit: cost,
+          customer_price_unit: price,
+          customer_price_total: price != null ? price * qty : null,
+          msrp_unit: item.msrp ?? null,
+          markup_percent: cost && price ? Math.round(((price - cost) / cost) * 100) : null,
+          pricing_status: cost != null ? "Confirmed" : "Needs Pricing",
+          notes: item.notes || null,
+          sort_order: idx,
+        }
+      })
+
+      const { error } = await supabase.from("bom_line_items").insert(rows)
+      if (error) return { error: error.message }
+
+      const pricedCount = rows.filter(r => r.pricing_status === "Confirmed").length
+      const totalCustomer = rows.reduce((s, r) => s + (r.customer_price_total || 0), 0)
+      return {
+        success: true, proposal_name: proposal.proposal_name,
+        items_added: rows.length,
+        priced: pricedCount, needs_pricing: rows.length - pricedCount,
+        customer_total: totalCustomer > 0 ? `$${totalCustomer.toFixed(2)}` : null,
+        action: "added_bom_items",
+      }
     }
 
     case "get_pipeline_summary": {

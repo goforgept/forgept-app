@@ -151,7 +151,8 @@ export default function SignProposal() {
     const allLaborTotal = lTotal + secLaborTotal
     const taxRate = (!prop.tax_exempt && prop.tax_rate) ? parseFloat(prop.tax_rate) : 0
     const taxAmt = Math.round(mTotal * (taxRate / 100) * 100) / 100
-    const grandTotal = mTotal + allLaborTotal + taxAmt
+    const signShippingFee = parseFloat(prop?.shipping_fee) || 0
+    const grandTotal = mTotal + allLaborTotal + taxAmt + signShippingFee
 
     if (items.length > 0) {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -261,7 +262,7 @@ export default function SignProposal() {
     } else {
     let summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : yPos + 8
     const pageHeight = doc.internal.pageSize.getHeight()
-    const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (taxRate > 0 ? 7 : 0) + 12
+    const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (taxRate > 0 ? 7 : 0) + (signShippingFee > 0 ? 7 : 0) + 12
     if (summaryY + summaryHeight > pageHeight - 20) { doc.addPage(); summaryY = 20 }
     const summaryX = pageWidth - 96
     doc.setDrawColor(200, 200, 200)
@@ -279,6 +280,11 @@ export default function SignProposal() {
     if (taxRate > 0) {
       doc.text(`Tax (${taxRate}% on materials):`, summaryX, summaryY)
       doc.text(`$${taxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY, { align: 'right' })
+      summaryY += 7
+    }
+    if (signShippingFee > 0) {
+      doc.text(`${prop?.shipping_description || 'Shipping & Handling'}:`, summaryX, summaryY)
+      doc.text(`$${signShippingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY, { align: 'right' })
       summaryY += 7
     }
     doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -523,7 +529,8 @@ export default function SignProposal() {
   const laborTotal = proposalLaborTotal + sectionLaborTotal
   const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
   const taxAmount = Math.round(materialsTotal * (taxRate / 100) * 100) / 100
-  const grandTotal = materialsTotal + laborTotal + taxAmount
+  const htmlShippingFee = parseFloat(proposal?.shipping_fee) || 0
+  const grandTotal = materialsTotal + laborTotal + taxAmount + htmlShippingFee
   const acceptedSlaInitialFees = slaContracts.reduce((sum, c, i) => slaAccepted[i] !== false ? sum + (parseFloat(c.initial_fee) || 0) : sum, 0)
   const totalUpfront = grandTotal + acceptedSlaInitialFees
   const acceptedSlaRecurring = slaContracts.filter((c, i) => slaAccepted[i] !== false && (parseFloat(c.recurring_fee) || 0) > 0)
@@ -735,6 +742,7 @@ export default function SignProposal() {
                         <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
                         {laborTotal > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
                         {taxRate > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
+                        {htmlShippingFee > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">{proposal?.shipping_description || 'Shipping & Handling'}</td><td className="text-white pt-1 text-right font-bold">${fmt(htmlShippingFee)}</td></tr>}
                         <tr className="border-t border-[#2a3d55]"><td colSpan={colSpan} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
                       </tfoot>
                     </table>
@@ -779,6 +787,7 @@ export default function SignProposal() {
                       <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
                       {laborTotal > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
                       {taxRate > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
+                      {htmlShippingFee > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">{proposal?.shipping_description || 'Shipping & Handling'}</td><td className="text-white pt-1 text-right font-bold">${fmt(htmlShippingFee)}</td></tr>}
                       <tr className="border-t border-[#2a3d55]"><td colSpan={colSpan} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
                     </tfoot>
                   </table>
