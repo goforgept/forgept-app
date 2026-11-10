@@ -71,6 +71,7 @@ export default function BomSection({
   onCopyLocation,
   updateShipping,
 }) {
+  const [shippingOpen, setShippingOpen] = useState(() => !!(proposal?.shipping_fee || proposal?.shipping_description))
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [markupMode, setMarkupMode] = useState('markup') // 'markup' | 'gpm'
@@ -1641,20 +1642,19 @@ export default function BomSection({
           </div>
 
           {/* Shipping */}
-          {(() => {
+          {(shippingOpen || canEdit) && (() => {
             const shippingFee = parseFloat(proposal?.shipping_fee) || 0
             const shippingCost = parseFloat(proposal?.shipping_your_cost) || 0
-            const shippingGP = shippingFee > 0 ? ((shippingFee - shippingCost) / shippingFee * 100).toFixed(1) : null
-            if (!shippingFee && !canEdit) return null
+            const shippingGP = shippingFee > 0 && shippingCost > 0 ? ((shippingFee - shippingCost) / shippingFee * 100).toFixed(1) : null
             return (
               <div className="mt-4 border border-fp-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-fp-text text-sm font-semibold">Shipping</p>
-                  {shippingFee > 0 && canEdit && (
-                    <button onClick={() => updateShipping({ shipping_fee: null, shipping_your_cost: null, shipping_description: null })} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
+                  {shippingOpen && canEdit && (
+                    <button onClick={() => { setShippingOpen(false); updateShipping({ shipping_fee: null, shipping_your_cost: null, shipping_description: null }) }} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Remove</button>
                   )}
                 </div>
-                {shippingFee > 0 ? (
+                {shippingOpen ? (
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <p className="text-fp-muted text-xs mb-1">Description</p>
@@ -1676,8 +1676,7 @@ export default function BomSection({
                     </div>
                   </div>
                 ) : canEdit ? (
-                  <button onClick={() => updateShipping({ shipping_fee: 0, shipping_your_cost: 0, shipping_description: 'Shipping & Handling' })}
-                    className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping Fee</button>
+                  <button onClick={() => setShippingOpen(true)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">+ Add Shipping Fee</button>
                 ) : null}
               </div>
             )
