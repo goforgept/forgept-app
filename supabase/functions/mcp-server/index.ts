@@ -151,6 +151,7 @@ const TOOLS = [
         proposal_name: { type: "string", description: "Name of the proposal to add the item to" },
         company: { type: "string", description: "Client company (used if proposal_name not known)" },
         section_name: { type: "string", description: "Section name (e.g. 'Access Control', 'Cameras'). Created if it doesn't exist." },
+        location_name: { type: "string", description: "Location/floor this section belongs to (e.g. 'Floor 1', 'Server Room'). Only needed when the BOM uses location grouping." },
         item_name: { type: "string", description: "Product name or description" },
         part_number: { type: "string", description: "Manufacturer part number" },
         manufacturer: { type: "string", description: "Manufacturer name" },
@@ -186,6 +187,7 @@ const TOOLS = [
               quantity: { type: "number", description: "Quantity" },
               unit: { type: "string", description: "Unit of measure, e.g. 'ea', 'ft'" },
               section_name: { type: "string", description: "Section to add this item to. Created if it doesn't exist." },
+              location_name: { type: "string", description: "Location/floor this section belongs to (e.g. 'Floor 1'). Only needed when the BOM uses location grouping." },
               your_cost: { type: "number", description: "Your dealer cost per unit (from external source or manual)" },
               customer_price: { type: "number", description: "Customer sell price per unit" },
               msrp: { type: "number", description: "MSRP per unit (pass through from manufacturer MCP)" },
@@ -332,14 +334,16 @@ const TOOLS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: string, sectionName: string | null): Promise<string | null> {
+async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: string, sectionName: string | null, locationName: string | null = null): Promise<string | null> {
   if (sectionName) {
-    const { data: sec } = await supabase.from("proposal_sections")
-      .select("id").eq("proposal_id", proposalId).ilike("name", `%${sectionName}%`).limit(1).maybeSingle()
+    let q = supabase.from("proposal_sections").select("id").eq("proposal_id", proposalId).ilike("name", `%${sectionName}%`)
+    if (locationName) q = q.ilike("location_name", `%${locationName}%`)
+    const { data: sec } = await q.limit(1).maybeSingle()
     if (sec) return sec.id
     // Create named section
     const { data: newSec } = await supabase.from("proposal_sections").insert({
       proposal_id: proposalId, org_id: orgId, name: sectionName, order_index: 999,
+      ...(locationName ? { location_name: locationName } : {}),
     }).select("id").single()
     return newSec?.id || null
   }
@@ -461,7 +465,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       if (!proposal) return { error: "No matching proposal found." }
 
       const { data: sections } = await supabase.from("proposal_sections")
-        .select("id, name, include_labor")
+        .select("id, name, location_name, include_labor, labor_items, shipping_fee, shipping_description")
         .eq("proposal_id", proposal.id).order("order_index")
 
       const { data: items } = await supabase.from("bom_line_items")
@@ -476,6 +480,34 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         else unsectioned.push(item)
       }
 
+      const sectionsOut = (sections || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        location: s.location_name || null,
+        include_labor: s.include_labor,
+        labor_items: s.labor_items || [],
+        shipping_fee: s.shipping_fee ? parseFloat(s.shipping_fee) : null,
+        shipping_description: s.shipping_description || null,
+        items: (sectionMap[s.id] || []).map(i => ({
+          id: i.id, name: i.item_name, part_number: i.part_number_sku, manufacturer: i.manufacturer,
+          qty: i.quantity, unit: i.unit || 'ea',
+          your_cost: i.your_cost_unit, customer_price: i.customer_price_unit,
+          customer_total: i.customer_price_total, msrp: i.msrp_unit,
+          pricing_status: i.pricing_status, category: i.category, notes: i.notes,
+        })),
+      }))
+
+      // Group by location when any section has a location_name
+      const hasLocations = sectionsOut.some(s => s.location)
+      const locationGroups: Record<string, any[]> = {}
+      if (hasLocations) {
+        for (const s of sectionsOut) {
+          const loc = s.location || 'General'
+          if (!locationGroups[loc]) locationGroups[loc] = []
+          locationGroups[loc].push(s)
+        }
+      }
+
       return {
         proposal: {
           name: proposal.proposal_name, company: proposal.company, client: proposal.client_name,
@@ -484,16 +516,10 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           customer_total: proposal.proposal_value, your_cost: proposal.total_your_cost,
           margin_pct: proposal.total_gross_margin_percent,
         },
-        sections: (sections || []).map(s => ({
-          id: s.id, name: s.name, include_labor: s.include_labor,
-          items: (sectionMap[s.id] || []).map(i => ({
-            id: i.id, name: i.item_name, part_number: i.part_number_sku, manufacturer: i.manufacturer,
-            qty: i.quantity, unit: i.unit || 'ea',
-            your_cost: i.your_cost_unit, customer_price: i.customer_price_unit,
-            customer_total: i.customer_price_total, msrp: i.msrp_unit,
-            pricing_status: i.pricing_status, category: i.category, notes: i.notes,
-          })),
-        })),
+        ...(hasLocations
+          ? { locations: Object.entries(locationGroups).map(([location, secs]) => ({ location, sections: secs })) }
+          : { sections: sectionsOut }
+        ),
         ...(unsectioned.length > 0 ? { unsectioned_items: unsectioned.map(i => ({ id: i.id, name: i.item_name, qty: i.quantity })) } : {}),
       }
     }
@@ -585,7 +611,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       }
       if (!proposal) return { error: "No matching proposal found. Provide proposal_name or company." }
 
-      const sectionId = await resolveOrCreateSection(supabase, proposal.id, orgId, input.section_name)
+      const sectionId = await resolveOrCreateSection(supabase, proposal.id, orgId, input.section_name, input.location_name || null)
       if (!sectionId) return { error: "Could not find or create a section in this proposal." }
 
       const qty = input.quantity ?? 1
@@ -624,20 +650,22 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const items: any[] = input.items || []
       if (items.length === 0) return { error: "No items provided." }
 
-      // Pre-resolve/create all unique sections in one pass
+      // Pre-resolve/create all unique sections in one pass, keyed by "location||section"
       const sectionCache: Record<string, string | null> = {}
-      const uniqueSectionNames = [...new Set(items.map((i: any) => i.section_name || null))]
-      for (const name of uniqueSectionNames) {
-        sectionCache[String(name)] = await resolveOrCreateSection(supabase, proposal.id, orgId, name)
+      const uniqueSectionKeys = [...new Set(items.map((i: any) => `${i.location_name || ''}||${i.section_name || ''}`))]
+      for (const key of uniqueSectionKeys) {
+        const [loc, sec] = key.split('||')
+        sectionCache[key] = await resolveOrCreateSection(supabase, proposal.id, orgId, sec || null, loc || null)
       }
 
       const rows = items.map((item: any, idx: number) => {
         const qty = item.quantity ?? 1
         const cost = item.your_cost ?? null
         const price = item.customer_price ?? null
+        const cacheKey = `${item.location_name || ''}||${item.section_name || ''}`
         return {
           proposal_id: proposal.id,
-          section_id: sectionCache[String(item.section_name || null)] || null,
+          section_id: sectionCache[cacheKey] || null,
           org_id: orgId,
           source: "agent",
           item_name: item.item_name,
