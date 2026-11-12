@@ -37,8 +37,15 @@ const TOOLS = [
   },
   {
     name: "get_client_overview",
-    description: "Get a full snapshot of a client — open proposals, open service tickets, and pending tasks",
-    inputSchema: { type: "object", properties: { company: { type: "string", description: "Company name to look up" } }, required: ["company"] },
+    description: "Get a full snapshot of a client — proposals, service tickets, and tasks",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name to look up" },
+        include_all: { type: "boolean", description: "Include Won/Lost proposals and closed tickets (default false — only open items)" },
+      },
+      required: ["company"],
+    },
   },
   {
     name: "create_client",
@@ -88,6 +95,7 @@ const TOOLS = [
         query: { type: "string", description: "Search term — company name, proposal name, or rep name" },
         status: { type: "string", description: "Filter by proposal status: Draft, Sent, Won, Lost" },
         stage: { type: "string", description: "Filter by pipeline stage name, e.g. Lead, Qualified, Proposal Sent" },
+        include_all: { type: "boolean", description: "Include Won, Lost, and expired proposals (default false — only open pipeline)" },
       },
       required: [],
     },
@@ -302,6 +310,7 @@ const TOOLS = [
       properties: {
         type: { type: "string", enum: ["clients", "proposals", "tickets"] },
         limit: { type: "number" },
+        include_all: { type: "boolean", description: "Include Won/Lost proposals and closed tickets (default false)" },
       },
       required: ["type"],
     },
@@ -416,15 +425,19 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         .select("id, company, client_name, email, phone, address, city, state, website, notes")
         .eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
       if (!client) return { error: `No client found matching "${input.company}".` }
+      let proposalsQ = supabase.from("proposals").select("id, proposal_name, status, proposal_value")
+        .eq("org_id", orgId).eq("client_id", client.id).limit(10)
+      if (!input.include_all) proposalsQ = proposalsQ.not("status", "in", '("Won","Lost")')
+      let ticketsQ = supabase.from("service_tickets").select("id, title, status, priority")
+        .eq("org_id", orgId).eq("client_id", client.id).limit(10)
+      if (!input.include_all) ticketsQ = ticketsQ.neq("status", "closed")
       const [{ data: proposals }, { data: tickets }, { data: tasks }] = await Promise.all([
-        supabase.from("proposals").select("id, proposal_name, status, proposal_value")
-          .eq("org_id", orgId).eq("client_id", client.id).not("status", "in", '("Won","Lost")').limit(5),
-        supabase.from("service_tickets").select("id, title, status, priority")
-          .eq("org_id", orgId).eq("client_id", client.id).neq("status", "closed").limit(5),
+        proposalsQ,
+        ticketsQ,
         supabase.from("tasks").select("id, title, due_date, status")
           .eq("org_id", orgId).eq("client_id", client.id).neq("status", "completed").limit(5),
       ])
-      return { client, open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
+      return { client, proposals: proposals || [], tickets: tickets || [], pending_tasks: tasks || [] }
     }
 
     case "create_client": {
@@ -469,6 +482,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         .select("id, proposal_name, company, client_name, status, proposal_value, created_at, quote_expires_at, pipeline_stages(name)")
         .eq("org_id", orgId).order("created_at", { ascending: false }).limit(25)
       if (input.status) query = query.ilike("status", `%${input.status}%`)
+      else if (!input.include_all) query = query.not("status", "in", '("Won","Lost")')
       if (input.query) {
         const q = `%${input.query}%`
         query = query.or(`proposal_name.ilike.${q},company.ilike.${q},client_name.ilike.${q}`)
@@ -917,13 +931,17 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         return { results: data || [] }
       }
       if (input.type === "proposals") {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company, status, proposal_value, created_at")
+        let q = supabase.from("proposals").select("id, proposal_name, company, status, proposal_value, created_at")
           .eq("org_id", orgId).order("created_at", { ascending: false }).limit(limit)
+        if (!input.include_all) q = q.not("status", "in", '("Won","Lost")')
+        const { data } = await q
         return { results: data || [] }
       }
       if (input.type === "tickets") {
-        const { data } = await supabase.from("service_tickets").select("id, title, status, priority, created_at")
+        let q = supabase.from("service_tickets").select("id, title, status, priority, created_at")
           .eq("org_id", orgId).order("created_at", { ascending: false }).limit(limit)
+        if (!input.include_all) q = q.neq("status", "closed")
+        const { data } = await q
         return { results: data || [] }
       }
       return { results: [] }
