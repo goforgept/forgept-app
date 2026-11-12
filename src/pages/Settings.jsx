@@ -1012,10 +1012,24 @@ function BillingTab() {
 
   if (loading) return <div className="text-fp-muted text-sm">Loading billing info...</div>
   if (error) return <div className="text-red-400 text-sm">{error}</div>
-  if (!billing?.connected) return (
-    <div className="max-w-lg space-y-4">
+  if (billing && !billing.connected) return (
+    <div className="max-w-lg space-y-6">
       <h3 className="text-fp-text font-semibold text-sm">Billing</h3>
-      <p className="text-fp-muted text-sm">No active subscription found. Contact support for help with your account.</p>
+      <div className="bg-fp-card rounded-xl border border-fp-border divide-y divide-fp-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-fp-muted text-sm">Status</span>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-fp-brand bg-fp-brand/10">
+            {billing.billing_status === 'trial' ? 'Trial' : (billing.billing_status || 'Trial')}
+          </span>
+        </div>
+        {billing.plan && (
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-fp-muted text-sm">Plan</span>
+            <span className="text-fp-text text-sm font-medium">{billing.plan}</span>
+          </div>
+        )}
+      </div>
+      <p className="text-fp-muted text-xs">To upgrade or make changes, contact <a href="mailto:Hello@goforgept.com" className="text-fp-brand hover:underline">Hello@goforgept.com</a>.</p>
     </div>
   )
 

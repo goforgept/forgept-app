@@ -35,7 +35,15 @@ Deno.serve(async (req) => {
       .single()
 
     if (!org?.stripe_customer_id) {
-      return new Response(JSON.stringify({ connected: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({
+        connected: false,
+        billing_status: org?.billing_status || 'trial',
+        plan: org?.plan || null,
+        amount: null,
+        interval: null,
+        next_billing_date: null,
+        cancel_at_period_end: false,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const customerId = org.stripe_customer_id
