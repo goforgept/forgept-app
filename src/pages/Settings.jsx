@@ -584,6 +584,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'email',        label: 'Email Templates' },
         { key: 'sla',          label: 'SLA & Contracts' },
         { key: 'data',         label: 'Data & Import' },
+        { key: 'billing',      label: 'Billing' },
       ]
     }] : []),
     ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
@@ -823,6 +824,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             </div>
           )}
 
+          {activeTab === 'billing' && isAdmin && <BillingTab />}
+
           {activeTab === 'security' && (
             <div className="space-y-6 max-w-lg">
               <div>
@@ -964,6 +967,87 @@ function FeedbackTab({ profile }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function BillingTab() {
+  const [billing, setBilling] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    supabase.functions.invoke('stripe-org-billing').then(({ data, error: err }) => {
+      if (err) setError(err.message || 'Failed to load billing info')
+      else if (data?.error) setError(data.error)
+      else setBilling(data)
+      setLoading(false)
+    })
+  }, [])
+
+  const formatAmount = (cents, interval) => {
+    if (!cents) return '—'
+    const dollars = (cents / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    return `$${dollars} / ${interval || 'mo'}`
+  }
+
+  const formatDate = (unix) => {
+    if (!unix) return '—'
+    return new Date(unix * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
+  const statusColor = (s) => {
+    if (s === 'active') return 'text-green-400 bg-green-400/10'
+    if (s === 'past_due') return 'text-yellow-400 bg-yellow-400/10'
+    if (s === 'canceled' || s === 'cancelled') return 'text-red-400 bg-red-400/10'
+    return 'text-fp-muted bg-fp-inset'
+  }
+
+  const statusLabel = (s) => {
+    if (s === 'active') return 'Active'
+    if (s === 'past_due') return 'Past Due'
+    if (s === 'canceled' || s === 'cancelled') return 'Canceled'
+    return s || 'Unknown'
+  }
+
+  if (loading) return <div className="text-fp-muted text-sm">Loading billing info...</div>
+  if (error) return <div className="text-red-400 text-sm">{error}</div>
+  if (!billing?.connected) return (
+    <div className="max-w-lg space-y-4">
+      <h3 className="text-fp-text font-semibold text-sm">Billing</h3>
+      <p className="text-fp-muted text-sm">No active subscription found. Contact support for help with your account.</p>
+    </div>
+  )
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <h3 className="text-fp-text font-semibold text-sm">Billing</h3>
+      <div className="bg-fp-card rounded-xl border border-fp-border divide-y divide-fp-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-fp-muted text-sm">Plan</span>
+          <span className="text-fp-text text-sm font-medium">{billing.plan || '—'}</span>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-fp-muted text-sm">Status</span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor(billing.billing_status)}`}>
+            {statusLabel(billing.billing_status)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-fp-muted text-sm">Amount</span>
+          <span className="text-fp-text text-sm font-medium">{formatAmount(billing.amount, billing.interval)}</span>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-fp-muted text-sm">Next billing date</span>
+          <span className="text-fp-text text-sm font-medium">{formatDate(billing.next_billing_date)}</span>
+        </div>
+        {billing.cancel_at_period_end && (
+          <div className="px-4 py-3">
+            <p className="text-yellow-400 text-xs">Your subscription will not renew. Access continues until {formatDate(billing.next_billing_date)}.</p>
+          </div>
+        )}
+      </div>
+      <p className="text-fp-muted text-xs">To make changes to your plan or payment method, contact <a href="mailto:Hello@goforgept.com" className="text-fp-brand hover:underline">Hello@goforgept.com</a>.</p>
     </div>
   )
 }

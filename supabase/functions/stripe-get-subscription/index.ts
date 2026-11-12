@@ -13,9 +13,8 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const anonKey     = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  const stripeKey   = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
 
-  // Verify superadmin — use service role to bypass RLS (superadmin has org_id = null)
+  // Verify superadmin
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authError } = await userClient.auth.getUser()
   if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
       'Authorization': `Bearer ${supabaseKey}`,
       'Content-Type': 'application/json',
     }
-    const stripeHeaders = { 'Authorization': `Bearer ${stripeKey}` }
 
     // Fetch org — only need stripe_customer_id
     const orgRes = await fetch(
@@ -48,38 +46,44 @@ Deno.serve(async (req) => {
     const customerId = org.stripe_customer_id
     console.log('stripe-get-subscription: orgId=', orgId, 'customerId=', customerId)
 
-    // Fetch subscriptions for this customer directly from Stripe (no DB column needed)
-    const subsRes = await fetch(
-      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&limit=5&expand[]=data.latest_invoice`,
-      { headers: stripeHeaders }
-    )
-    const subsData = await subsRes.json()
+    // Query subscriptions from Stripe FDW
+    const { data: subRows, error: subError } = await adminClient
+      .schema('stripe')
+      .from('subscriptions')
+      .select('id, attrs')
+      .eq('attrs->>customer', customerId)
+      .limit(10)
 
-    // Customer was deleted in Stripe — clear it from our DB
-    if (subsData?.error?.code === 'resource_missing' || subsData?.error?.type === 'invalid_request_error') {
-      await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
-        method: 'PATCH',
-        headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ stripe_customer_id: null, billing_status: 'trial' }),
-      })
-      return new Response(JSON.stringify({ connected: false, cleared: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (subError) {
+      console.error('stripe FDW subscriptions error:', subError)
+      return new Response(JSON.stringify({ error: 'Failed to query Stripe data: ' + subError.message }), { status: 500, headers: corsHeaders })
     }
+
+    // Query latest invoices from Stripe FDW
+    const { data: invoiceRows } = await adminClient
+      .schema('stripe')
+      .from('invoices')
+      .select('id, attrs')
+      .eq('attrs->>customer', customerId)
+      .limit(10)
 
     let subscription = null
     let invoiceUrl = null
 
-    if (subsData?.data?.length > 0) {
+    if (subRows && subRows.length > 0) {
       // Prefer active, then incomplete, then most recent
-      const sub = subsData.data.find((s: any) => s.status === 'active')
-        || subsData.data.find((s: any) => s.status === 'incomplete')
-        || subsData.data[0]
+      const subRow = subRows.find((r: any) => r.attrs?.status === 'active')
+        || subRows.find((r: any) => r.attrs?.status === 'incomplete')
+        || subRows[0]
 
-      // current_period_end was removed in Stripe API 2025+; compute from billing_cycle_anchor + interval
-      let periodEnd: number | null = sub.current_period_end || null
+      const attrs = subRow.attrs || {}
+
+      // current_period_end is null in the FDW; compute from billing_cycle_anchor + interval
+      let periodEnd: number | null = attrs.current_period_end || null
       if (!periodEnd || periodEnd < Math.floor(Date.now() / 1000)) {
-        const anchor = sub.billing_cycle_anchor
-        const interval: string = sub.plan?.interval || 'year'
-        const intervalCount: number = sub.plan?.interval_count || 1
+        const anchor = attrs.billing_cycle_anchor
+        const interval: string = attrs.plan?.interval || attrs.items?.data?.[0]?.price?.recurring?.interval || 'year'
+        const intervalCount: number = attrs.plan?.interval_count || attrs.items?.data?.[0]?.price?.recurring?.interval_count || 1
         if (anchor) {
           const nextDate = new Date(anchor * 1000)
           const now = new Date()
@@ -92,31 +96,38 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Find the latest open invoice for due_date and hosted_invoice_url
+      const openInvoice = invoiceRows?.find((r: any) => r.attrs?.subscription === subRow.id && r.attrs?.status === 'open')
+        || invoiceRows?.find((r: any) => r.attrs?.status === 'open')
+
+      const latestInvoice = invoiceRows?.find((r: any) => r.attrs?.subscription === subRow.id)
+        || invoiceRows?.[0]
+
+      if (latestInvoice?.attrs?.hosted_invoice_url) {
+        invoiceUrl = latestInvoice.attrs.hosted_invoice_url
+      }
+
       subscription = {
-        id: sub.id,
-        status: sub.status,
+        id: subRow.id,
+        status: attrs.status,
         current_period_end: periodEnd,
-        due_date: sub.latest_invoice?.status === 'open' ? (sub.latest_invoice?.due_date ?? null) : null,
-        cancel_at_period_end: sub.cancel_at_period_end,
-        amount: sub.items?.data?.[0]?.price?.unit_amount,
-        interval: sub.items?.data?.[0]?.price?.recurring?.interval,
-        plan_name: sub.metadata?.plan || sub.items?.data?.[0]?.price?.nickname || '',
-        collection_method: sub.collection_method,
+        due_date: openInvoice?.attrs?.due_date ?? null,
+        cancel_at_period_end: attrs.cancel_at_period_end,
+        amount: attrs.items?.data?.[0]?.price?.unit_amount,
+        interval: attrs.items?.data?.[0]?.price?.recurring?.interval,
+        plan_name: attrs.metadata?.plan || attrs.items?.data?.[0]?.price?.nickname || '',
+        collection_method: attrs.collection_method,
       }
 
-      if (sub.latest_invoice?.hosted_invoice_url) {
-        invoiceUrl = sub.latest_invoice.hosted_invoice_url
-      }
-
-      // Sync billing_status, plan, monthly_rate back to Supabase
+      // Sync billing_status, plan, monthly_rate back to organizations
       const billingStatus =
-        sub.status === 'active'    ? 'active'    :
-        sub.status === 'past_due'  ? 'past_due'  :
-        sub.status === 'canceled'  ? 'cancelled' : 'pending'
+        attrs.status === 'active'    ? 'active'    :
+        attrs.status === 'past_due'  ? 'past_due'  :
+        attrs.status === 'canceled'  ? 'cancelled' : 'pending'
 
-      const planName    = sub.metadata?.plan || null
-      const amountCents = sub.items?.data?.[0]?.price?.unit_amount || 0
-      const interval    = sub.items?.data?.[0]?.price?.recurring?.interval || 'month'
+      const planName    = attrs.metadata?.plan || null
+      const amountCents = attrs.items?.data?.[0]?.price?.unit_amount || 0
+      const interval    = attrs.items?.data?.[0]?.price?.recurring?.interval || 'month'
       const monthlyRate = interval === 'year'
         ? Math.round(amountCents / 12 / 100)
         : Math.round(amountCents / 100)
