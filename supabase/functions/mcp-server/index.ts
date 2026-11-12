@@ -319,6 +319,32 @@ const TOOLS = [
     },
   },
   {
+    name: "get_proposal_sow",
+    description: "Get the current scope of work (SOW) text for a proposal",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string" },
+        company: { type: "string", description: "Client company name (used if proposal_name not known)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "update_proposal_sow",
+    description: "Write or update the scope of work (SOW) for a proposal. Use mode 'replace' to overwrite the entire SOW, or 'append' to add content after the existing text.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string" },
+        company: { type: "string", description: "Client company name (used if proposal_name not known)" },
+        content: { type: "string", description: "The SOW text to write. Markdown is supported." },
+        mode: { type: "string", enum: ["replace", "append"], description: "replace overwrites the full SOW; append adds after existing content (default: replace)" },
+      },
+      required: ["content"],
+    },
+  },
+  {
     name: "get_drawing_analysis",
     description: "Get the AI drawing analysis results for a proposal's floor plan — device counts by category as identified from the uploaded drawing",
     inputSchema: {
@@ -980,6 +1006,57 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         return { period_days: periodDays, top_clients: Object.entries(clientMap).map(([company, d]) => ({ company, ...d })).sort((a, b) => b.won - a.won).slice(0, 10) }
       }
       return { error: "Unknown report type." }
+    }
+
+    case "get_proposal_sow": {
+      let proposal: any = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+      return {
+        proposal: proposal.proposal_name,
+        company: proposal.company,
+        scope_of_work: proposal.scope_of_work || null,
+        has_sow: !!proposal.scope_of_work,
+      }
+    }
+
+    case "update_proposal_sow": {
+      if (!input.content) return { error: "content is required." }
+      let proposal: any = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+
+      const newSow = input.mode === 'append' && proposal.scope_of_work
+        ? `${proposal.scope_of_work}\n\n${input.content}`
+        : input.content
+
+      const { error } = await supabase.from("proposals").update({ scope_of_work: newSow }).eq("id", proposal.id)
+      if (error) return { error: error.message }
+      return {
+        success: true,
+        proposal: proposal.proposal_name,
+        company: proposal.company,
+        mode: input.mode || 'replace',
+        action: "updated_proposal_sow",
+      }
     }
 
     case "get_drawing_analysis": {
