@@ -339,6 +339,10 @@ export default function SuperAdmin() {
   const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', qboAddon: false })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
+  const [updateAmountOpen, setUpdateAmountOpen] = useState(false)
+  const [updateAmountForm, setUpdateAmountForm] = useState({ amount: '', interval: 'year', planName: '', proration: 'none' })
+  const [updatingAmount, setUpdatingAmount] = useState(false)
+  const [updateAmountResult, setUpdateAmountResult] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingOrg, setDeletingOrg] = useState(false)
@@ -711,6 +715,34 @@ export default function SuperAdmin() {
       setStripeResult({ success: false, message: err.message })
     }
     setCreatingSubscription(false)
+  }
+
+  const updateSubscriptionAmount = async (orgId) => {
+    const dollars = parseFloat(updateAmountForm.amount)
+    if (!dollars || dollars <= 0) { setUpdateAmountResult({ success: false, message: 'Enter a valid dollar amount.' }); return }
+    setUpdatingAmount(true)
+    setUpdateAmountResult(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-update-subscription', {
+        body: {
+          orgId,
+          newAmountDollars: dollars,
+          interval: updateAmountForm.interval,
+          planName: updateAmountForm.planName || undefined,
+          proration: updateAmountForm.proration,
+        }
+      })
+      if (error) setUpdateAmountResult({ success: false, message: error.message })
+      else if (data?.error) setUpdateAmountResult({ success: false, message: data.error })
+      else {
+        setUpdateAmountResult({ success: true, message: 'Subscription updated!' })
+        fetchStripeData(orgId)
+        setTimeout(() => { setUpdateAmountOpen(false); setUpdateAmountResult(null); setUpdateAmountForm({ amount: '', interval: 'year', planName: '', proration: 'none' }) }, 2000)
+      }
+    } catch (err) {
+      setUpdateAmountResult({ success: false, message: err.message })
+    }
+    setUpdatingAmount(false)
   }
 
   const getPlanInfo = (planName) => PLANS.find(p => p.name === planName) || PLANS[0]
@@ -1470,6 +1502,70 @@ export default function SuperAdmin() {
                                 : <span className="text-[#8A9AB0] text-xs">Not included</span>}
                             </div>
                           </div>
+                          {/* Update Amount inline form */}
+                          <div className="border-t border-[#2a3d55] pt-3">
+                            {!updateAmountOpen ? (
+                              <button onClick={() => { setUpdateAmountOpen(true); setUpdateAmountResult(null); setUpdateAmountForm({ amount: '', interval: stripeData.subscription.interval || 'year', planName: stripeData.subscription.plan_name || '', proration: 'none' }) }}
+                                className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                                + Update Amount
+                              </button>
+                            ) : (
+                              <div className="space-y-3">
+                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Update Amount</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-[#8A9AB0] text-xs mb-1 block">New Total ($)</label>
+                                    <input
+                                      type="number" min="1" step="1"
+                                      placeholder={`${((stripeData.subscription.amount || 0) / 100).toLocaleString()}`}
+                                      value={updateAmountForm.amount}
+                                      onChange={e => setUpdateAmountForm(p => ({ ...p, amount: e.target.value }))}
+                                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[#8A9AB0] text-xs mb-1 block">Interval</label>
+                                    <select value={updateAmountForm.interval} onChange={e => setUpdateAmountForm(p => ({ ...p, interval: e.target.value }))}
+                                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                                      <option value="year">Annual</option>
+                                      <option value="month">Monthly</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-[#8A9AB0] text-xs mb-1 block">Plan Label (optional)</label>
+                                  <input type="text" placeholder={stripeData.subscription.plan_name || 'e.g. Full Platform'}
+                                    value={updateAmountForm.planName}
+                                    onChange={e => setUpdateAmountForm(p => ({ ...p, planName: e.target.value }))}
+                                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[#8A9AB0] text-xs mb-1 block">When to apply</label>
+                                  <div className="flex gap-2">
+                                    {[{ v: 'none', label: 'Next renewal' }, { v: 'create_prorations', label: 'Prorate now' }].map(opt => (
+                                      <button key={opt.v} type="button"
+                                        onClick={() => setUpdateAmountForm(p => ({ ...p, proration: opt.v }))}
+                                        className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${updateAmountForm.proration === opt.v ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A]'}`}>
+                                        {opt.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                {updateAmountResult && (
+                                  <p className={`text-xs ${updateAmountResult.success ? 'text-green-400' : 'text-red-400'}`}>{updateAmountResult.message}</p>
+                                )}
+                                <div className="flex gap-2">
+                                  <button onClick={() => { setUpdateAmountOpen(false); setUpdateAmountResult(null) }} className="flex-1 py-1.5 text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
+                                  <button onClick={() => updateSubscriptionAmount(org.id)} disabled={updatingAmount || !updateAmountForm.amount}
+                                    className="flex-1 bg-[#C8622A] text-white py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                                    {updatingAmount ? 'Updating...' : 'Apply'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                           <div className="flex items-center justify-between pt-1">
                             <a href={`https://dashboard.stripe.com/customers/${stripeData.customerId}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs font-mono hover:text-[#C8622A] transition-colors" title="Open in Stripe">{stripeData.customerId}</a>
                             <a href={`https://dashboard.stripe.com/subscriptions/${stripeData.subscription.id}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs font-mono hover:text-[#C8622A] transition-colors" title="Open in Stripe">{stripeData.subscription.id}</a>
