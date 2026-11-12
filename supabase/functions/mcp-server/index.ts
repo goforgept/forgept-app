@@ -319,6 +319,18 @@ const TOOLS = [
     },
   },
   {
+    name: "get_drawing_analysis",
+    description: "Get the AI drawing analysis results for a proposal's floor plan — device counts by category as identified from the uploaded drawing",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string" },
+        company: { type: "string", description: "Client company name (used if proposal_name not known)" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_reports",
     description: "Pull revenue, pipeline, or win-rate reports",
     inputSchema: {
@@ -968,6 +980,47 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         return { period_days: periodDays, top_clients: Object.entries(clientMap).map(([company, d]) => ({ company, ...d })).sort((a, b) => b.won - a.won).slice(0, 10) }
       }
       return { error: "Unknown report type." }
+    }
+
+    case "get_drawing_analysis": {
+      let proposal: any = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+
+      const { data: sheets } = await supabase.from("drawing_sheets")
+        .select("id, name, ai_summary")
+        .eq("proposal_id", proposal.id)
+        .not("ai_summary", "is", null)
+        .order("sort_order", { ascending: true })
+        .limit(10)
+
+      if (!sheets || sheets.length === 0) {
+        return { proposal: proposal.proposal_name, company: proposal.company, analyzed: false, message: "No drawing analysis found for this proposal." }
+      }
+
+      return {
+        proposal: proposal.proposal_name,
+        company: proposal.company,
+        analyzed: true,
+        sheets: sheets.map(s => ({
+          sheet: s.name,
+          analyzed_at: s.ai_summary?.analyzedAt || null,
+          file_name: s.ai_summary?.fileName || null,
+          items: (s.ai_summary?.items || []).map((i: any) => ({
+            name: i.item_name, category: i.category || null,
+            quantity: i.quantity, notes: i.notes || null,
+          })),
+        })),
+      }
     }
 
     default:

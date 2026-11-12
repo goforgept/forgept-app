@@ -145,7 +145,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
         .order('sort_order', { ascending: true })
 
       setSheets(sheetData || [])
-      if (sheetData?.length > 0) setActiveSheetId(sheetData[0].id)
+      if (sheetData?.length > 0) {
+        setActiveSheetId(sheetData[0].id)
+        // Restore persisted AI analysis if present on any sheet
+        const sheetWithSummary = sheetData.find(s => s.ai_summary)
+        if (sheetWithSummary?.ai_summary) setDrawingAnalysis(sheetWithSummary.ai_summary)
+      }
 
       const { data: roomData } = await supabase
         .from('rooms').select('*').eq('proposal_id', proposalId).order('sort_order')
@@ -520,9 +525,15 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     setAnalyzingDrawing(false)
   }
 
-  const applyDrawingAnalysis = () => {
+  const applyDrawingAnalysis = async () => {
     if (drawingPreview.length === 0) return
-    setDrawingAnalysis({ items: drawingPreview, analyzedAt: new Date().toISOString(), fileName: drawingFile?.name || 'Drawing' })
+    const summary = { items: drawingPreview, analyzedAt: new Date().toISOString(), fileName: drawingFile?.name || 'Drawing' }
+    setDrawingAnalysis(summary)
+    // Persist to the first sheet so it survives refresh
+    const targetSheetId = activeSheetId || sheets[0]?.id
+    if (targetSheetId) {
+      await supabase.from('drawing_sheets').update({ ai_summary: summary }).eq('id', targetSheetId)
+    }
     setShowDrawingModal(false)
     setDrawingFile(null)
     setDrawingInstructions('')
