@@ -40,13 +40,9 @@ Deno.serve(async (req) => {
 
     const customerId = org.stripe_customer_id
 
-    // Query subscription from Stripe FDW
+    // Query subscription from Stripe FDW via RPC wrapper
     const { data: subRows, error: subError } = await adminClient
-      .schema('stripe')
-      .from('subscriptions')
-      .select('id, attrs')
-      .eq('attrs->>customer', customerId)
-      .limit(5)
+      .rpc('get_stripe_subs_for_customer', { p_customer: customerId })
 
     if (subError) {
       console.error('stripe FDW error:', subError)

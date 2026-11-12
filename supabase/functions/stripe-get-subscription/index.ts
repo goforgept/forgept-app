@@ -46,26 +46,18 @@ Deno.serve(async (req) => {
     const customerId = org.stripe_customer_id
     console.log('stripe-get-subscription: orgId=', orgId, 'customerId=', customerId)
 
-    // Query subscriptions from Stripe FDW
+    // Query subscriptions from Stripe FDW via RPC wrapper
     const { data: subRows, error: subError } = await adminClient
-      .schema('stripe')
-      .from('subscriptions')
-      .select('id, attrs')
-      .eq('attrs->>customer', customerId)
-      .limit(10)
+      .rpc('get_stripe_subs_for_customer', { p_customer: customerId })
 
     if (subError) {
       console.error('stripe FDW subscriptions error:', subError)
       return new Response(JSON.stringify({ error: 'Failed to query Stripe data: ' + subError.message }), { status: 500, headers: corsHeaders })
     }
 
-    // Query latest invoices from Stripe FDW
+    // Query latest invoices from Stripe FDW via RPC wrapper
     const { data: invoiceRows } = await adminClient
-      .schema('stripe')
-      .from('invoices')
-      .select('id, attrs')
-      .eq('attrs->>customer', customerId)
-      .limit(10)
+      .rpc('get_stripe_invoices_for_customer', { p_customer: customerId })
 
     let subscription = null
     let invoiceUrl = null
