@@ -33,6 +33,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     const rep = params.get('rep')
 
     if (status === 'Won') setStatusFilters(new Set(['Won']))
+    else if (status === 'Lost') setStatusFilters(new Set(['Lost']))
+    else if (status === 'Draft') setStatusFilters(new Set(['Draft']))
+    else if (status === 'Sent') setStatusFilters(new Set(['Sent']))
     else if (status === 'active') setStatusFilters(new Set(['Draft', 'Sent']))
     if (rep) setSearch(rep)
   }, [])

@@ -381,28 +381,51 @@ const TOOLS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: string, sectionName: string | null, locationName: string | null = null): Promise<string | null> {
+async function findProposalByCompany(supabase: any, orgId: string, company: string, includeWonLost = false): Promise<any> {
+  // Prefer proposals linked via client_id FK so the client record stays connected
+  const { data: client } = await supabase.from("clients")
+    .select("id").eq("org_id", orgId).ilike("company", `%${company}%`).limit(1).maybeSingle()
+  if (client) {
+    let q = supabase.from("proposals").select("id, proposal_name, company, client_id")
+      .eq("org_id", orgId).eq("client_id", client.id)
+    if (!includeWonLost) q = q.not("status", "in", '("Won","Lost")')
+    const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle()
+    if (data) return data
+  }
+  // Fall back to text match (proposals not yet linked to a client record)
+  let q = supabase.from("proposals").select("id, proposal_name, company, client_id")
+    .eq("org_id", orgId).ilike("company", `%${company}%`)
+  if (!includeWonLost) q = q.not("status", "in", '("Won","Lost")')
+  const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle()
+  return data || null
+}
+
+async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: string, sectionName: string | null, locationName: string | null = null): Promise<{ id: string } | { error: string }> {
   if (sectionName) {
     let q = supabase.from("proposal_sections").select("id").eq("proposal_id", proposalId).ilike("name", `%${sectionName}%`)
     if (locationName) q = q.ilike("location_name", `%${locationName}%`)
     const { data: sec } = await q.limit(1).maybeSingle()
-    if (sec) return sec.id
+    if (sec) return { id: sec.id }
     // Create named section
-    const { data: newSec } = await supabase.from("proposal_sections").insert({
-      proposal_id: proposalId, org_id: orgId, name: sectionName, order_index: 999,
+    const { data: newSec, error: insertErr } = await supabase.from("proposal_sections").insert({
+      proposal_id: proposalId, org_id: orgId, name: sectionName, sort_order: 999,
       ...(locationName ? { location_name: locationName } : {}),
     }).select("id").single()
-    return newSec?.id || null
+    if (insertErr) return { error: `Section create failed: ${insertErr.message}` }
+    if (!newSec?.id) return { error: "Section insert returned no id" }
+    return { id: newSec.id }
   }
   // Fall back to first existing section
   const { data: firstSec } = await supabase.from("proposal_sections")
-    .select("id").eq("proposal_id", proposalId).order("order_index").limit(1).maybeSingle()
-  if (firstSec) return firstSec.id
+    .select("id").eq("proposal_id", proposalId).order("sort_order").limit(1).maybeSingle()
+  if (firstSec) return { id: firstSec.id }
   // Create a default section
-  const { data: newSec } = await supabase.from("proposal_sections").insert({
-    proposal_id: proposalId, org_id: orgId, name: "Products", order_index: 0,
+  const { data: newSec, error: insertErr } = await supabase.from("proposal_sections").insert({
+    proposal_id: proposalId, org_id: orgId, name: "Products", sort_order: 0,
   }).select("id").single()
-  return newSec?.id || null
+  if (insertErr) return { error: `Default section create failed: ${insertErr.message}` }
+  if (!newSec?.id) return { error: "Default section insert returned no id" }
+  return { id: newSec.id }
 }
 
 // ─── Tool execution ───────────────────────────────────────────────────────────
@@ -508,11 +531,13 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals")
-          .select("id, proposal_name, company, client_name, status, proposal_value, total_your_cost, total_gross_margin_percent, quote_number, quote_expires_at")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
+        if (proposal) {
+          const { data: full } = await supabase.from("proposals")
+            .select("id, proposal_name, company, client_name, status, proposal_value, total_your_cost, total_gross_margin_percent, quote_number, quote_expires_at")
+            .eq("id", proposal.id).single()
+          if (full) proposal = full
+        }
       }
       if (!proposal) return { error: "No matching proposal found." }
 
@@ -580,16 +605,25 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const { data: profile } = userId
         ? await supabase.from("profiles").select("full_name, email").eq("id", userId).single()
         : { data: null }
+      // Look up client to get client_id for proper linking
+      let clientId: string | null = null
+      let resolvedCompany: string | null = input.company || null
+      if (input.company) {
+        const { data: client } = await supabase.from("clients")
+          .select("id, company").eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+        if (client) { clientId = client.id; resolvedCompany = client.company }
+      }
       const { data, error } = await supabase.from("proposals").insert({
         org_id: orgId, user_id: userId || null,
-        proposal_name: input.proposal_name, company: input.company || null,
+        proposal_name: input.proposal_name, company: resolvedCompany,
+        client_id: clientId,
         client_name: input.client_name || null, client_email: input.client_email || null,
         proposal_value: input.proposal_value || 0, status: "Draft",
         rep_name: profile?.full_name || null, rep_email: profile?.email || null,
         quote_expires_at: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split('T')[0] })(),
       }).select("id, proposal_name").single()
       if (error) return { error: error.message }
-      return { success: true, id: data.id, proposal_name: data.proposal_name, action: "created_proposal" }
+      return { success: true, id: data.id, proposal_name: data.proposal_name, client_linked: !!clientId, action: "created_proposal" }
     }
 
     case "update_proposal": {
@@ -599,10 +633,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
       }
       if (!proposal) return { error: "No matching proposal found." }
       const updates: Record<string, any> = {}
@@ -628,10 +659,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company, status")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
       }
       if (!proposal) return { error: "No matching proposal found." }
       if (proposal.status === input.status) return { error: `Already marked ${input.status}.` }
@@ -652,19 +680,17 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     case "add_bom_item": {
       let proposal: any = null
       if (input.proposal_name) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, client_id")
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
       }
       if (!proposal) return { error: "No matching proposal found. Provide proposal_name or company." }
 
-      const sectionId = await resolveOrCreateSection(supabase, proposal.id, orgId, input.section_name, input.location_name || null)
-      if (!sectionId) return { error: "Could not find or create a section in this proposal." }
+      const secResult = await resolveOrCreateSection(supabase, proposal.id, orgId, input.section_name, input.location_name || null)
+      if ("error" in secResult) return { error: secResult.error }
+      const sectionId = secResult.id
 
       const qty = input.quantity ?? 1
       const cost = input.your_cost ?? null
@@ -688,14 +714,11 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     case "add_bom_items": {
       let proposal: any = null
       if (input.proposal_name) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, client_id")
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, org_id")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
       }
       if (!proposal) return { error: "No matching proposal found. Provide proposal_name or company." }
 
@@ -707,7 +730,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const uniqueSectionKeys = [...new Set(items.map((i: any) => `${i.location_name || ''}||${i.section_name || ''}`))]
       for (const key of uniqueSectionKeys) {
         const [loc, sec] = key.split('||')
-        sectionCache[key] = await resolveOrCreateSection(supabase, proposal.id, orgId, sec || null, loc || null)
+        const r = await resolveOrCreateSection(supabase, proposal.id, orgId, sec || null, loc || null)
+        sectionCache[key] = "error" in r ? null : r.id
       }
 
       const rows = items.map((item: any, idx: number) => {
@@ -772,11 +796,13 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals")
-          .select("id, proposal_name, company, client_name, status, proposal_value, created_at, pipeline_stages(name)")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
+        if (proposal && !proposal.pipeline_stages) {
+          const { data: full } = await supabase.from("proposals")
+            .select("id, proposal_name, company, client_name, status, proposal_value, created_at, pipeline_stages(name)")
+            .eq("id", proposal.id).single()
+          if (full) proposal = full
+        }
       }
       if (!proposal) return { error: "No matching proposal found." }
       const [{ data: activities }, { data: tasks }, { data: emails }] = await Promise.all([
@@ -872,25 +898,79 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     }
 
     case "search_products": {
-      let query = supabase.from("product_library")
-        .select("item_name, part_number, manufacturer, category, description, msrp")
-        .eq("org_id", orgId).order("item_name").limit(30)
-      if (input.query) {
-        const q = `%${input.query}%`
-        query = query.or(`item_name.ilike.${q},part_number.ilike.${q},manufacturer.ilike.${q},description.ilike.${q}`)
+      const q = input.query ? `%${input.query}%` : null
+
+      // 1. Org's custom product library
+      let libQuery = supabase.from("product_library")
+        .select("id, item_name, part_number, manufacturer, category, description, msrp")
+        .eq("org_id", orgId).eq("active", true).order("item_name").limit(50)
+      if (q) libQuery = libQuery.or(`item_name.ilike.${q},part_number.ilike.${q},manufacturer.ilike.${q},description.ilike.${q}`)
+      if (input.category) libQuery = libQuery.ilike("category", `%${input.category}%`)
+      if (input.manufacturer) libQuery = libQuery.ilike("manufacturer", `%${input.manufacturer}%`)
+
+      // 2. Org's pricing for product_library items (get best/lowest cost per product)
+      const [{ data: libProducts }, { data: pricing }, { data: orgRow }] = await Promise.all([
+        libQuery,
+        supabase.from("product_library_pricing").select("product_id, your_cost, vendor").eq("org_id", orgId).order("your_cost", { ascending: true }),
+        supabase.from("organizations").select("enabled_catalogs, catalog_discounts").eq("id", orgId).single(),
+      ])
+
+      // Build a map: product_id → best (lowest) cost entry
+      const costMap: Record<string, { cost: number; vendor: string }> = {}
+      for (const p of (pricing || [])) {
+        if (p.your_cost != null && !costMap[p.product_id]) {
+          costMap[p.product_id] = { cost: p.your_cost, vendor: p.vendor || "" }
+        }
       }
-      if (input.category) query = query.ilike("category", `%${input.category}%`)
-      if (input.manufacturer) query = query.ilike("manufacturer", `%${input.manufacturer}%`)
-      const { data: products } = await query
-      return {
-        total: (products || []).length,
-        products: (products || []).map((p: any) => ({
+
+      const libResults = (libProducts || []).map((p: any) => {
+        const best = costMap[p.id]
+        return {
           name: p.item_name, part_number: p.part_number || null,
           manufacturer: p.manufacturer || null, category: p.category || null,
           description: p.description || null,
           msrp: p.msrp != null ? `$${Number(p.msrp).toFixed(2)}` : null,
-        })),
+          your_cost: best ? `$${Number(best.cost).toFixed(2)}` : null,
+          vendor: best?.vendor || null,
+          source: "library",
+        }
+      })
+
+      // 3. Enabled manufacturer catalogs (pricebooks)
+      const enabledSlugs: string[] = orgRow?.enabled_catalogs || []
+      const catalogDiscounts: Record<string, number> = orgRow?.catalog_discounts || {}
+      let catResults: any[] = []
+
+      if (enabledSlugs.length > 0 && (q || input.manufacturer || input.category)) {
+        let catQuery = supabase.from("catalog_products")
+          .select("catalog_slug, catalog_label, manufacturer, part_number, model_name, msrp, category, description")
+          .in("catalog_slug", enabledSlugs).eq("active", true).limit(50)
+        if (q) catQuery = catQuery.or(`model_name.ilike.${q},part_number.ilike.${q},manufacturer.ilike.${q},description.ilike.${q}`)
+        if (input.category) catQuery = catQuery.ilike("category", `%${input.category}%`)
+        if (input.manufacturer) catQuery = catQuery.ilike("manufacturer", `%${input.manufacturer}%`)
+        const { data: catProducts } = await catQuery
+
+        catResults = (catProducts || []).map((p: any) => {
+          const discountPct = catalogDiscounts[p.catalog_slug] || 0
+          const yourCost = (discountPct > 0 && p.msrp != null)
+            ? p.msrp * (1 - discountPct / 100)
+            : null
+          return {
+            name: p.model_name || p.part_number,
+            part_number: p.part_number || null,
+            manufacturer: p.manufacturer || null,
+            category: p.category || null,
+            description: p.description || null,
+            msrp: p.msrp != null ? `$${Number(p.msrp).toFixed(2)}` : null,
+            your_cost: yourCost != null ? `$${Number(yourCost).toFixed(2)}` : null,
+            vendor: p.manufacturer || null,
+            source: `catalog: ${p.catalog_label || p.catalog_slug}`,
+          }
+        })
       }
+
+      const all = [...libResults, ...catResults]
+      return { total: all.length, products: all }
     }
 
     case "get_inventory": {
@@ -1033,10 +1113,11 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
+        if (proposal) {
+          const { data: full } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work").eq("id", proposal.id).single()
+          if (full) proposal = full
+        }
       }
       if (!proposal) return { error: "No matching proposal found." }
       return {
@@ -1055,10 +1136,11 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
+        if (proposal) {
+          const { data: full } = await supabase.from("proposals").select("id, proposal_name, company, scope_of_work").eq("id", proposal.id).single()
+          if (full) proposal = full
+        }
       }
       if (!proposal) return { error: "No matching proposal found." }
 
@@ -1084,10 +1166,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
         proposal = data
       } else if (input.company) {
-        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
-          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
-          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
-        proposal = data
+        proposal = await findProposalByCompany(supabase, orgId, input.company)
       }
       if (!proposal) return { error: "No matching proposal found." }
 

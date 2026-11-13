@@ -22,6 +22,7 @@ const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
 // ─── Widget: Revenue Metrics ─────────────────────────────────────────────────
 
 function RevenueMetricsWidget({ proposals }) {
+  const navigate = useNavigate()
   const won    = proposals.filter(p => p.status === 'Won')
   const lost   = proposals.filter(p => p.status === 'Lost')
   const active = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost')
@@ -41,12 +42,12 @@ function RevenueMetricsWidget({ proposals }) {
   const last30 = proposals.filter(p => new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
 
   const cards = [
-    { label: 'Active Pipeline',    value: fmt(activeVal),  color: 'text-fp-text' },
-    { label: 'Total Won',          value: fmt(wonVal),     color: 'text-green-400' },
+    { label: 'Active Pipeline',    value: fmt(activeVal),  color: 'text-fp-text',    href: '/proposals?status=active' },
+    { label: 'Total Won',          value: fmt(wonVal),     color: 'text-green-400',  href: '/proposals?status=Won' },
     { label: 'Win Rate',           value: winRate !== null ? `${winRate}%` : '—', color: 'text-fp-brand' },
     { label: 'Avg Deal Size',      value: fmt(avgDeal),    color: 'text-blue-400' },
     { label: 'Avg Margin',         value: avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—', color: 'text-purple-400' },
-    { label: 'Closing in 30d',     value: closing,         color: closing > 0 ? 'text-yellow-400' : 'text-fp-muted' },
+    { label: 'Closing in 30d',     value: closing,         color: closing > 0 ? 'text-yellow-400' : 'text-fp-muted', href: '/proposals?closing=30' },
     { label: 'Created (30d)',       value: last30,          color: last30 > 0 ? 'text-sky-400' : 'text-fp-muted' },
   ]
   return (
@@ -54,7 +55,9 @@ function RevenueMetricsWidget({ proposals }) {
       <p className="text-fp-text font-bold mb-3">Revenue Metrics</p>
       <div className="grid grid-cols-3 lg:grid-cols-7 gap-3">
         {cards.map(c => (
-          <div key={c.label} className="bg-fp-inset rounded-xl p-4 border border-fp-border/50">
+          <div key={c.label}
+            className={`bg-fp-inset rounded-xl p-4 border border-fp-border/50 ${c.href ? 'cursor-pointer hover:bg-fp-hover transition-colors' : ''}`}
+            onClick={c.href ? () => navigate(c.href) : undefined}>
             <p className="text-fp-muted text-xs mb-2">{c.label}</p>
             <p className={`${c.color} text-xl font-bold`}>{c.value}</p>
           </div>
@@ -67,6 +70,7 @@ function RevenueMetricsWidget({ proposals }) {
 // ─── Widget: Pipeline by Stage ────────────────────────────────────────────────
 
 function PipelineStageWidget({ proposals }) {
+  const navigate = useNavigate()
   const stages = ['Draft', 'Sent', 'Won', 'Lost']
   const data = stages.map(s => ({
     stage: s,
@@ -101,7 +105,8 @@ function PipelineStageWidget({ proposals }) {
       </ResponsiveContainer>
       <div className="grid grid-cols-4 gap-3 mt-4 pt-3 border-t border-fp-border/50">
         {data.map(d => (
-          <div key={d.stage} className="text-center">
+          <div key={d.stage} className="text-center cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={() => navigate(`/proposals?status=${d.stage}`)}>
             <p className="text-fp-text text-2xl font-bold">{d.count}</p>
             <p style={{ color: STATUS_COLOR[d.stage] }} className="text-xs font-semibold mt-0.5">{d.stage}</p>
           </div>
