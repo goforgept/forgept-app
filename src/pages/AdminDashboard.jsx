@@ -61,7 +61,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
-      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,quote_expires_at,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,quote_expires_at,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,sent_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
@@ -110,7 +110,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   }
 
   const markAsSent = async (proposalId) => {
-    await supabase.from('proposals').update({ status: 'Sent' }).eq('id', proposalId)
+    await supabase.from('proposals').update({ status: 'Sent', sent_at: new Date().toISOString() }).eq('id', proposalId)
     setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: 'Sent' } : p))
   }
 
@@ -139,7 +139,11 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const filteredProposals = useMemo(() => {
     const startDate = getStartDate(period)
     if (!startDate) return proposals
-    return proposals.filter(p => new Date(p.created_at) >= startDate)
+    return proposals.filter(p => {
+      // Use sent_at for Sent proposals, created_at for Draft
+      const dateToCheck = p.status === 'Sent' ? (p.sent_at || p.created_at) : p.created_at
+      return new Date(dateToCheck) >= startDate
+    })
   }, [proposals, period])
 
   const pval = p => p.subtotal_value ?? p.proposal_value ?? 0

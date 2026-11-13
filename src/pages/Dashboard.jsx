@@ -393,7 +393,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   }
 
   const markAsSent = async (proposalId) => {
-    await supabase.from('proposals').update({ status: 'Sent' }).eq('id', proposalId)
+    await supabase.from('proposals').update({ status: 'Sent', sent_at: new Date().toISOString() }).eq('id', proposalId)
     setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: 'Sent' } : p))
   }
 

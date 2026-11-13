@@ -20,7 +20,7 @@ export default function ProposalHeader({
   quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
   saveContractNumber, setEditingContractNumber,
-  updateCloseDate, updateQuoteExpiry, updateTaxExempt, updateTaxRate, updateIndustry,
+  updateCloseDate, updateQuoteExpiry, updateSentAt, updateTaxExempt, updateTaxRate, updateIndustry,
   onSaveDealAmount,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
@@ -358,6 +358,17 @@ export default function ProposalHeader({
             <span className="text-fp-text text-sm font-medium">{proposal?.quote_expires_at || '—'}</span>
           )}
         </Cell>
+
+        {(proposal?.status === 'Sent' || proposal?.sent_at) && (
+          <Cell label="Sent Date" className="min-w-[120px]">
+            {canEdit ? (
+              <input type="date" value={proposal?.sent_at ? proposal.sent_at.slice(0, 10) : ''} onChange={e => updateSentAt?.(e.target.value)}
+                className={`${inputCls} cursor-pointer`} />
+            ) : (
+              <span className="text-fp-text text-sm font-medium">{proposal?.sent_at ? proposal.sent_at.slice(0, 10) : '—'}</span>
+            )}
+          </Cell>
+        )}
 
         <Cell label="Industry" className="min-w-[110px]">
           {canEdit && updateIndustry ? (

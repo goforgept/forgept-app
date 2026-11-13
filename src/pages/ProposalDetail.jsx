@@ -249,7 +249,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at,show_cover_page,disable_auto_updates,disable_followup_emails,quote_expires_at,shipping_fee,shipping_your_cost,shipping_description')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,sent_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at,show_cover_page,disable_auto_updates,disable_followup_emails,quote_expires_at,shipping_fee,shipping_your_cost,shipping_description')
       .eq('id', id)
       .single()
 
@@ -672,6 +672,12 @@ export default function ProposalDetail({ isAdmin }) {
   const updateQuoteExpiry = async (newDate) => {
     await supabase.from('proposals').update({ quote_expires_at: newDate || null }).eq('id', id)
     setProposal(prev => ({ ...prev, quote_expires_at: newDate || null }))
+  }
+
+  const updateSentAt = async (newDate) => {
+    const iso = newDate ? new Date(newDate + 'T12:00:00').toISOString() : null
+    await supabase.from('proposals').update({ sent_at: iso }).eq('id', id)
+    setProposal(prev => ({ ...prev, sent_at: iso }))
   }
 
   const updateRep = async (repProfile) => {
@@ -1488,8 +1494,9 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const markAsSent = async () => {
-    await supabase.from('proposals').update({ status: 'Sent' }).eq('id', id)
-    setProposal(prev => ({ ...prev, status: 'Sent' }))
+    const sentAt = new Date().toISOString()
+    await supabase.from('proposals').update({ status: 'Sent', sent_at: sentAt }).eq('id', id)
+    setProposal(prev => ({ ...prev, status: 'Sent', sent_at: sentAt }))
     setShowSentPrompt(false)
   }
 
@@ -4204,7 +4211,7 @@ const analyzeDrawing = async () => {
           editingContractNumber={editingContractNumber} contractNumberDraft={contractNumberDraft}
           setContractNumberDraft={setContractNumberDraft} saveContractNumber={saveContractNumber}
           setEditingContractNumber={setEditingContractNumber}
-          updateCloseDate={updateCloseDate} updateQuoteExpiry={updateQuoteExpiry} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate} updateIndustry={updateIndustry}
+          updateCloseDate={updateCloseDate} updateQuoteExpiry={updateQuoteExpiry} updateSentAt={updateSentAt} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate} updateIndustry={updateIndustry}
           onSaveDealAmount={saveDealAmount}
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}

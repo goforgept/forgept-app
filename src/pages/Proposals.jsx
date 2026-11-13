@@ -62,7 +62,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     let proposalsQuery = supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_gross_margin_percent,created_at,sent_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
       .eq('org_id', profile.org_id)
       .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
@@ -152,7 +152,15 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       const start = getDateStart()
       const end = getDateEnd()
       if (!start && !end) return true
-      const d = new Date(p.created_at)
+      // Sent proposals: filter by sent_at (when actually sent), falling back to created_at
+      // Won/Lost: filter by updated_at (when status changed), falling back to created_at
+      // Draft: filter by created_at
+      const dateField = p.status === 'Sent'
+        ? (p.sent_at || p.created_at)
+        : (p.status === 'Won' || p.status === 'Lost')
+          ? (p.updated_at || p.created_at)
+          : p.created_at
+      const d = new Date(dateField)
       if (start && d < start) return false
       if (end && d > end) return false
       return true

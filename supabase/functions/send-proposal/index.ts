@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
     await Promise.all([
       // Mark proposal as Sent
-      adminSupabase.from('proposals').update({ status: 'Sent' }).eq('id', proposalId).eq('org_id', profile.org_id),
+      adminSupabase.from('proposals').update({ status: 'Sent', sent_at: new Date().toISOString() }).eq('id', proposalId).eq('org_id', profile.org_id),
       // Store email record for open tracking
       adminSupabase.from('client_emails').insert({
         org_id:               profile.org_id,
