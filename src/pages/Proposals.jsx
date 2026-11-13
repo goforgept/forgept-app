@@ -10,6 +10,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [search, setSearch] = useState('')
   const [statusFilters, setStatusFilters] = useState(new Set())
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false)
+  const dateDropdownRef = useRef(null)
   const [showArchived, setShowArchived] = useState(false)
   const [closingSoon, setClosingSoon] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
@@ -23,7 +25,10 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const { canWrite, scope } = usePermissions()
 
   useEffect(() => {
-    const handler = (e) => { if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target)) setStatusDropdownOpen(false) }
+    const handler = (e) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target)) setStatusDropdownOpen(false)
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target)) setDateDropdownOpen(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
@@ -289,27 +294,30 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   </div>
                 )}
               </div>
-            </div>
-          )}
-          {!showArchived && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
-                {[['all', 'All Time'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['ytd', 'YTD'], ['custom', 'Custom']].map(([val, label]) => (
-                  <button key={val} onClick={() => { setDateRange(val); if (val !== 'custom') { setDateFrom(''); setDateTo('') } }}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${dateRange === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
-                    {label}
-                  </button>
-                ))}
+              <div className="relative" ref={dateDropdownRef}>
+                <button onClick={() => setDateDropdownOpen(o => !o)}
+                  className={`bg-fp-card text-fp-text border rounded-lg px-3 py-2 text-sm flex items-center gap-2 hover:border-fp-brand transition-colors min-w-[130px] justify-between ${dateRange !== 'all' ? 'border-fp-brand' : 'border-fp-border'}`}>
+                  <span className="truncate">{dateRange === 'all' ? 'All Dates' : dateRange === 'mtd' ? 'Month to Date' : dateRange === 'qtd' ? 'Quarter to Date' : dateRange === 'ytd' ? 'Year to Date' : dateFrom || dateTo ? `${dateFrom || '…'} – ${dateTo || '…'}` : 'Custom'}</span>
+                  <span className="text-fp-muted text-xs flex-shrink-0">▾</span>
+                </button>
+                {dateDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[200px] py-1 overflow-hidden">
+                    {[['all', 'All Dates'], ['mtd', 'Month to Date'], ['qtd', 'Quarter to Date'], ['ytd', 'Year to Date']].map(([val, label]) => (
+                      <button key={val} onClick={() => { setDateRange(val); setDateFrom(''); setDateTo(''); setDateDropdownOpen(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-fp-inset ${dateRange === val ? 'text-fp-brand font-semibold' : 'text-fp-text'}`}>
+                        {label}
+                      </button>
+                    ))}
+                    <div className="border-t border-fp-border mt-1 pt-2 px-4 pb-3 space-y-2">
+                      <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Custom Range</p>
+                      <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateRange('custom') }}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                      <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setDateRange('custom') }}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                    </div>
+                  </div>
+                )}
               </div>
-              {dateRange === 'custom' && (
-                <div className="flex items-center gap-2">
-                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                    className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                  <span className="text-fp-muted text-xs">–</span>
-                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                    className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                </div>
-              )}
             </div>
           )}
         </div>
