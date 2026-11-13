@@ -260,6 +260,17 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     }).sort((a, b) => new Date(a.quote_expires_at) - new Date(b.quote_expires_at))
   , [proposals])
 
+  const expiringQuotes = useMemo(() => {
+    const now = new Date()
+    const in10 = new Date(Date.now() + 10 * 86400000)
+    return proposals.filter(p => {
+      if (p.status !== 'Sent') return false
+      if (!p.quote_expires_at) return false
+      const exp = new Date(p.quote_expires_at)
+      return exp >= now && exp <= in10
+    }).sort((a, b) => new Date(a.quote_expires_at) - new Date(b.quote_expires_at))
+  }, [proposals])
+
   const [expiredPricingCount, setExpiredPricingCount] = useState(0)
   const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
 
@@ -803,6 +814,36 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                       {p.company && <span className="text-red-400/70 text-xs ml-2">· {p.company}</span>}
                     </div>
                     <span className="text-red-400/50 group-hover:text-red-400 text-xs transition-colors">View →</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {!loading && expiringQuotes.length > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-red-400">🔴</span>
+              <div>
+                <p className="text-fp-text font-semibold text-sm">Expiring Soon</p>
+                <p className="text-red-400 text-xs">{expiringQuotes.length} sent proposal{expiringQuotes.length !== 1 ? 's' : ''} expire{expiringQuotes.length === 1 ? 's' : ''} within 10 days</p>
+              </div>
+            </div>
+            <div className="space-y-1 pl-6">
+              {expiringQuotes.map(p => {
+                const daysLeft = Math.ceil((new Date(p.quote_expires_at) - new Date()) / (1000 * 60 * 60 * 24))
+                return (
+                  <button key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
+                    className="w-full text-left flex items-center justify-between bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-lg px-3 py-2 transition-colors group">
+                    <div>
+                      <span className="text-fp-text text-xs font-semibold">{p.proposal_name || 'Untitled'}</span>
+                      {p.company && <span className="text-red-400/70 text-xs ml-2">· {p.company}</span>}
+                      {p.rep_name && <span className="text-fp-muted text-xs ml-2">· {p.rep_name}</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-red-400 text-xs font-semibold">{daysLeft === 0 ? 'Expires today' : daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}</span>
+                      <span className="text-red-400/50 group-hover:text-red-400 text-xs transition-colors">View →</span>
+                    </div>
                   </button>
                 )
               })}

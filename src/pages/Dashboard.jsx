@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../supabase'
@@ -448,6 +448,25 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     p.status === 'Draft' && Math.floor((new Date() - new Date(p.created_at)) / 864e5) >= 3
   ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
+  const expiringQuotes = useMemo(() => {
+    const now = new Date()
+    const in10 = new Date(Date.now() + 10 * 86400000)
+    return proposals.filter(p => {
+      if (p.status !== 'Sent') return false
+      if (!p.quote_expires_at) return false
+      const exp = new Date(p.quote_expires_at)
+      return exp >= now && exp <= in10
+    }).sort((a, b) => new Date(a.quote_expires_at) - new Date(b.quote_expires_at))
+  }, [proposals])
+
+  const expiredQuotes = useMemo(() =>
+    proposals.filter(p => {
+      if (p.status !== 'Sent') return false
+      if (!p.quote_expires_at) return false
+      return new Date(p.quote_expires_at) < new Date()
+    }).sort((a, b) => new Date(a.quote_expires_at) - new Date(b.quote_expires_at))
+  , [proposals])
+
   const outstandingAR = invoices.filter(i => i.status === 'Sent' || i.status === 'Partial').reduce((s, i) => s + (i.balance_due || 0), 0)
   const overdueAR     = invoices.filter(i => i.due_date && i.status !== 'Paid' && new Date(i.due_date) < new Date() && (i.status === 'Sent' || i.status === 'Partial')).reduce((s, i) => s + (i.balance_due || 0), 0)
   const needsInvoice  = proposals.filter(p => p.status === 'Won' && !invoices.some(inv => inv.proposal_id === p.id)).length
@@ -616,6 +635,68 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
                       </p>
                     </div>
                   </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Expiring Soon ── */}
+        {!loading && expiringQuotes.length > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-red-400">🔴</span>
+              <div>
+                <p className="text-fp-text font-semibold text-sm">Expiring Soon</p>
+                <p className="text-red-400 text-xs">{expiringQuotes.length} sent proposal{expiringQuotes.length !== 1 ? 's' : ''} expire{expiringQuotes.length === 1 ? 's' : ''} within 10 days</p>
+              </div>
+            </div>
+            <div className="space-y-1 pl-6">
+              {expiringQuotes.map(p => {
+                const daysLeft = Math.ceil((new Date(p.quote_expires_at) - new Date()) / (1000 * 60 * 60 * 24))
+                return (
+                  <button key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
+                    className="w-full text-left flex items-center justify-between bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-lg px-3 py-2 transition-colors group">
+                    <div>
+                      <span className="text-fp-text text-xs font-semibold">{p.proposal_name || 'Untitled'}</span>
+                      {p.company && <span className="text-red-400/70 text-xs ml-2">· {p.company}</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-red-400 text-xs font-semibold">{daysLeft === 0 ? 'Expires today' : daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}</span>
+                      <span className="text-red-400/50 group-hover:text-red-400 text-xs transition-colors">View →</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Expired Quotes ── */}
+        {!loading && expiredQuotes.length > 0 && (
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-orange-400">⏰</span>
+              <div>
+                <p className="text-fp-text font-semibold text-sm">Expired Quotes</p>
+                <p className="text-orange-400 text-xs">{expiredQuotes.length} sent proposal{expiredQuotes.length !== 1 ? 's' : ''} {expiredQuotes.length !== 1 ? 'have' : 'has'} passed their expiry date</p>
+              </div>
+            </div>
+            <div className="space-y-1 pl-6">
+              {expiredQuotes.map(p => {
+                const daysAgo = Math.floor((new Date() - new Date(p.quote_expires_at)) / (1000 * 60 * 60 * 24))
+                return (
+                  <button key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
+                    className="w-full text-left flex items-center justify-between bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 rounded-lg px-3 py-2 transition-colors group">
+                    <div>
+                      <span className="text-fp-text text-xs font-semibold">{p.proposal_name || 'Untitled'}</span>
+                      {p.company && <span className="text-orange-400/70 text-xs ml-2">· {p.company}</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-orange-400 text-xs">{daysAgo === 0 ? 'Expired today' : `${daysAgo}d ago`}</span>
+                      <span className="text-orange-400/50 group-hover:text-orange-400 text-xs transition-colors">View →</span>
+                    </div>
+                  </button>
                 )
               })}
             </div>
