@@ -209,6 +209,17 @@ const TOOLS = [
     },
   },
   {
+    name: "get_expiring_quotes",
+    description: "Get quotes that are expired or expiring soon. Returns two lists: already expired (status still Sent, past quote_expires_at) and expiring within a given number of days. Useful for follow-up and renewal workflows.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days_ahead: { type: "number", description: "How many days ahead to look for expiring quotes (default 10)" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_pipeline_summary",
     description: "Get a summary of the current sales pipeline — counts and values by stage",
     inputSchema: { type: "object", properties: {}, required: [] },
@@ -772,6 +783,44 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         priced: pricedCount, needs_pricing: rows.length - pricedCount,
         customer_total: totalCustomer > 0 ? `$${totalCustomer.toFixed(2)}` : null,
         action: "added_bom_items",
+      }
+    }
+
+    case "get_expiring_quotes": {
+      const daysAhead = input.days_ahead ?? 10
+      const today = new Date().toISOString().split("T")[0]
+      const futureDate = new Date(Date.now() + daysAhead * 86400000).toISOString().split("T")[0]
+
+      const { data } = await supabase.from("proposals")
+        .select("id, proposal_name, company, client_name, rep_name, proposal_value, quote_expires_at, status")
+        .eq("org_id", orgId)
+        .eq("status", "Sent")
+        .not("quote_expires_at", "is", null)
+        .lte("quote_expires_at", futureDate)
+        .order("quote_expires_at", { ascending: true })
+
+      const expired: any[] = []
+      const expiringSoon: any[] = []
+
+      for (const p of (data || [])) {
+        const daysUntil = Math.ceil((new Date(p.quote_expires_at).getTime() - Date.now()) / 86400000)
+        const entry = {
+          id: p.id,
+          proposal_name: p.proposal_name,
+          company: p.company || p.client_name || "Unknown",
+          rep: p.rep_name || null,
+          value: p.proposal_value || 0,
+          expires: p.quote_expires_at,
+          days_until_expiry: daysUntil,
+        }
+        if (daysUntil < 0) expired.push({ ...entry, days_expired: Math.abs(daysUntil) })
+        else expiringSoon.push(entry)
+      }
+
+      return {
+        expired: { count: expired.length, quotes: expired },
+        expiring_soon: { count: expiringSoon.length, within_days: daysAhead, quotes: expiringSoon },
+        total: expired.length + expiringSoon.length,
       }
     }
 
