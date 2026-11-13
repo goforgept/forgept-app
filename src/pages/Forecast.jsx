@@ -33,6 +33,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   }
 
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? '0'
+  const ytdStart = `${new Date().getFullYear()}-01-01`
 
   // Active-only proposals filtered by close date window.
   // Won/Lost are historical — they live in their own stat cards and never change with the filter.
@@ -116,10 +117,9 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       repMap[rep].won += pval(p)
     })
     return Object.values(repMap).sort((a, b) => b.pipeline - a.pipeline)
-  }, [filteredProposals, proposals])
+  }, [filteredProposals, proposals, ytdStart])
 
   const totalActivePipeline = filteredProposals.reduce((sum, p) => sum + pval(p), 0)
-  const ytdStart = `${new Date().getFullYear()}-01-01`
   const totalWon = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at) >= ytdStart).reduce((sum, p) => sum + pval(p), 0)
   const totalWonCount = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at) >= ytdStart).length
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
