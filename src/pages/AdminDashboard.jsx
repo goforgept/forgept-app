@@ -61,7 +61,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
-      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
@@ -143,8 +143,16 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   }, [proposals, period])
 
   const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
+
+  // Won proposals filtered by updated_at (when they were marked Won), not created_at
+  const wonProposals = useMemo(() => {
+    const startDate = getStartDate(period)
+    if (!startDate) return proposals.filter(p => p.status === 'Won')
+    return proposals.filter(p => p.status === 'Won' && new Date(p.updated_at || p.created_at) >= startDate)
+  }, [proposals, period])
+
   const activePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + pval(p), 0)
-  const wonPipeline = filteredProposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + pval(p), 0)
+  const wonPipeline = wonProposals.reduce((sum, p) => sum + pval(p), 0)
   const closingSoon = filteredProposals.filter(p => {
     if (!p.close_date) return false
     const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -152,8 +160,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   }).length
   const avgMargin = filteredProposals.filter(p => p.total_gross_margin_percent).length > 0
     ? (filteredProposals.reduce((sum, p) => sum + (p.total_gross_margin_percent || 0), 0) / filteredProposals.filter(p => p.total_gross_margin_percent).length).toFixed(1) : null
-  const wonCount = filteredProposals.filter(p => p.status === 'Won').length
-  const closeRate = filteredProposals.length > 0 ? ((wonCount / filteredProposals.length) * 100).toFixed(1) : null
+  const wonCount = wonProposals.length
+  const closeRate = (wonCount + filteredProposals.filter(p => p.status === 'Lost').length) > 0
+    ? ((wonCount / (wonCount + filteredProposals.filter(p => p.status === 'Lost').length)) * 100).toFixed(1) : null
 
   // AR summary
   const outstandingAR = invoices.filter(i => i.status === 'Sent' || i.status === 'Partial').reduce((sum, i) => sum + (i.balance_due || 0), 0)
@@ -169,21 +178,25 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const pendingPOs = purchaseOrders.filter(p => p.status === 'Sent').length
   const totalPOValue = purchaseOrders.reduce((sum, p) => sum + (p.total_amount || 0), 0)
 
-  const repStats = Array.from(
-    filteredProposals.reduce((acc, p) => {
+  const repStats = useMemo(() => {
+    const map = new Map()
+    filteredProposals.forEach(p => {
       const rep = p.rep_name || 'Unknown'
-      if (!acc.has(rep)) acc.set(rep, { name: rep, pipeline: 0, won: 0, count: 0, margins: [] })
-      const entry = acc.get(rep)
-      entry.pipeline += pval(p)
-      if (p.status === 'Won') entry.won += pval(p)
+      if (!map.has(rep)) map.set(rep, { name: rep, pipeline: 0, won: 0, count: 0, margins: [] })
+      const entry = map.get(rep)
+      if (p.status !== 'Won' && p.status !== 'Lost') entry.pipeline += pval(p)
       entry.count += 1
       if (p.total_gross_margin_percent) entry.margins.push(p.total_gross_margin_percent)
-      return acc
-    }, new Map()).values()
-  ).map(rep => ({
-    ...rep,
-    avgMargin: rep.margins.length > 0 ? (rep.margins.reduce((a, b) => a + b, 0) / rep.margins.length).toFixed(1) : null
-  })).sort((a, b) => b.pipeline - a.pipeline)
+    })
+    wonProposals.forEach(p => {
+      const rep = p.rep_name || 'Unknown'
+      if (!map.has(rep)) map.set(rep, { name: rep, pipeline: 0, won: 0, count: 0, margins: [] })
+      map.get(rep).won += pval(p)
+    })
+    return Array.from(map.values())
+      .map(rep => ({ ...rep, avgMargin: rep.margins.length > 0 ? (rep.margins.reduce((a, b) => a + b, 0) / rep.margins.length).toFixed(1) : null }))
+      .sort((a, b) => b.pipeline - a.pipeline)
+  }, [filteredProposals, wonProposals])
 
   const closingSoonList = filteredProposals.filter(p => {
     if (!p.close_date) return false
@@ -200,12 +213,20 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         if (!client) return
         clientMap[p.client_id] = { id: p.client_id, name: client.company || p.company || 'Unknown', pipeline: 0, won: 0, count: 0 }
       }
-      clientMap[p.client_id].pipeline += pval(p)
-      if (p.status === 'Won') clientMap[p.client_id].won += pval(p)
+      if (p.status !== 'Won' && p.status !== 'Lost') clientMap[p.client_id].pipeline += pval(p)
       clientMap[p.client_id].count += 1
     })
+    wonProposals.forEach(p => {
+      if (!p.client_id) return
+      if (!clientMap[p.client_id]) {
+        const client = clients.find(c => c.id === p.client_id)
+        if (!client) return
+        clientMap[p.client_id] = { id: p.client_id, name: client.company || p.company || 'Unknown', pipeline: 0, won: 0, count: 0 }
+      }
+      clientMap[p.client_id].won += pval(p)
+    })
     return Object.values(clientMap).sort((a, b) => b.pipeline - a.pipeline).slice(0, 5)
-  }, [filteredProposals, clients])
+  }, [filteredProposals, wonProposals, clients])
 
   const topVendors = useMemo(() => {
     const proposalIds = new Set(filteredProposals.map(p => p.id))
@@ -232,7 +253,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const getLaborTotal = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0), 0)
     const getLaborHours = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0), 0)
     const active = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost')
-    const won = filteredProposals.filter(p => p.status === 'Won')
+    const won = wonProposals
     const closingSoonPs = filteredProposals.filter(p => {
       if (!p.close_date) return false
       const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -241,7 +262,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const dealsWithLabor = active.filter(p => (p.labor_items || []).some(l => parseFloat(l.customer_price) > 0))
     const laborQuoted = getLaborTotal(active)
     return { laborQuoted, laborWon: getLaborTotal(won), laborClosingSoon: getLaborTotal(closingSoonPs), hoursQuoted: getLaborHours(active), hoursWon: getLaborHours(won), hoursClosingSoon: getLaborHours(closingSoonPs), avgLaborPerDeal: dealsWithLabor.length > 0 ? getLaborTotal(active) / dealsWithLabor.length : 0, dealsWithLabor: dealsWithLabor.length }
-  }, [filteredProposals])
+  }, [filteredProposals, wonProposals])
 
   // Recurring revenue stats — filtered by selected period
   const recurringStats = useMemo(() => {
