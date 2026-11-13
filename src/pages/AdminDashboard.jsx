@@ -151,6 +151,12 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     return proposals.filter(p => p.status === 'Won' && new Date(p.updated_at || p.created_at) >= startDate)
   }, [proposals, period])
 
+  const lostProposals = useMemo(() => {
+    const startDate = getStartDate(period)
+    if (!startDate) return proposals.filter(p => p.status === 'Lost')
+    return proposals.filter(p => p.status === 'Lost' && new Date(p.updated_at || p.created_at) >= startDate)
+  }, [proposals, period])
+
   const activePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + pval(p), 0)
   const wonPipeline = wonProposals.reduce((sum, p) => sum + pval(p), 0)
   const closingSoon = filteredProposals.filter(p => {
@@ -161,8 +167,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const avgMargin = filteredProposals.filter(p => p.total_gross_margin_percent).length > 0
     ? (filteredProposals.reduce((sum, p) => sum + (p.total_gross_margin_percent || 0), 0) / filteredProposals.filter(p => p.total_gross_margin_percent).length).toFixed(1) : null
   const wonCount = wonProposals.length
-  const closeRate = (wonCount + filteredProposals.filter(p => p.status === 'Lost').length) > 0
-    ? ((wonCount / (wonCount + filteredProposals.filter(p => p.status === 'Lost').length)) * 100).toFixed(1) : null
+  const closeRate = (wonCount + lostProposals.length) > 0
+    ? ((wonCount / (wonCount + lostProposals.length)) * 100).toFixed(1) : null
 
   // AR summary
   const outstandingAR = invoices.filter(i => i.status === 'Sent' || i.status === 'Partial').reduce((sum, i) => sum + (i.balance_due || 0), 0)
@@ -393,7 +399,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {on('pipeline-chart') && (() => {
               const stages = ['Draft','Sent','Won','Lost']
-              const data = stages.map(s => ({ stage: s, count: filteredProposals.filter(p => p.status === s).length, value: filteredProposals.filter(p => p.status === s).reduce((sum, p) => sum + (p.proposal_value || 0), 0) }))
+              const stageSource = s => s === 'Won' ? wonProposals : s === 'Lost' ? lostProposals : filteredProposals.filter(p => p.status === s)
+              const data = stages.map(s => { const src = stageSource(s); return { stage: s, count: src.length, value: src.reduce((sum, p) => sum + (p.proposal_value || 0), 0) } })
               return (
                 <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
                   <p className="text-fp-text font-bold mb-4">Pipeline by Stage{periodShort[period]}</p>
