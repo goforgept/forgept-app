@@ -62,7 +62,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     let proposalsQuery = supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_gross_margin_percent,created_at,sent_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_gross_margin_percent,created_at,updated_at,sent_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
       .eq('org_id', profile.org_id)
       .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
