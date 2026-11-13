@@ -14,6 +14,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [closingSoon, setClosingSoon] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
+  const [dateRange, setDateRange] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const statusDropdownRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -88,6 +91,19 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const sixtyDaysAgo = new Date()
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
 
+  const getDateStart = () => {
+    const now = new Date()
+    if (dateRange === 'mtd') return new Date(now.getFullYear(), now.getMonth(), 1)
+    if (dateRange === 'qtd') return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+    if (dateRange === 'ytd') return new Date(now.getFullYear(), 0, 1)
+    if (dateRange === 'custom' && dateFrom) return new Date(dateFrom)
+    return null
+  }
+  const getDateEnd = () => {
+    if (dateRange === 'custom' && dateTo) { const d = new Date(dateTo); d.setHours(23, 59, 59, 999); return d }
+    return null
+  }
+
   const filtered = proposals
     .filter(p => showArchived ? !!p.archived_at : !p.archived_at)
     .filter(p => {
@@ -124,6 +140,15 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         p.client_name?.toLowerCase().includes(s) ||
         p.quote_number?.toLowerCase().includes(s)
       )
+    })
+    .filter(p => {
+      const start = getDateStart()
+      const end = getDateEnd()
+      if (!start && !end) return true
+      const d = new Date(p.created_at)
+      if (start && d < start) return false
+      if (end && d > end) return false
+      return true
     })
     .sort((a, b) => {
       if (sortBy === 'close_date') {
@@ -264,6 +289,27 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   </div>
                 )}
               </div>
+            </div>
+          )}
+          {!showArchived && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+                {[['all', 'All Time'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['ytd', 'YTD'], ['custom', 'Custom']].map(([val, label]) => (
+                  <button key={val} onClick={() => { setDateRange(val); if (val !== 'custom') { setDateFrom(''); setDateTo('') } }}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${dateRange === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {dateRange === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                    className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                  <span className="text-fp-muted text-xs">–</span>
+                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                    className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                </div>
+              )}
             </div>
           )}
         </div>
