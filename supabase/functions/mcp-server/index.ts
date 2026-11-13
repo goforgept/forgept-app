@@ -352,7 +352,7 @@ const TOOLS = [
   },
   {
     name: "update_proposal_sow",
-    description: "Write or update the scope of work (SOW) for a proposal. Use mode 'replace' to overwrite the entire SOW, or 'append' to add content after the existing text.",
+    description: "Write or update the scope of work (SOW) for a proposal. IMPORTANT: Always ask the user what they want the SOW to say before calling this tool — never generate or write a SOW on your own initiative. Only call this after the user has explicitly told you the content to write or confirmed they want you to draft it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -360,8 +360,9 @@ const TOOLS = [
         company: { type: "string", description: "Client company name (used if proposal_name not known)" },
         content: { type: "string", description: "The SOW text to write. Markdown is supported." },
         mode: { type: "string", enum: ["replace", "append"], description: "replace overwrites the full SOW; append adds after existing content (default: replace)" },
+        confirmed: { type: "boolean", description: "Must be true — user has explicitly asked you to write or update the SOW" },
       },
-      required: ["content"],
+      required: ["content", "confirmed"],
     },
   },
   {
@@ -1178,6 +1179,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     }
 
     case "update_proposal_sow": {
+      if (!input.confirmed) return { error: "User confirmation required before writing a scope of work. Ask the user what they want the SOW to say, or confirm they want you to draft one." }
       if (!input.content) return { error: "content is required." }
       let proposal: any = null
       if (input.proposal_name) {
