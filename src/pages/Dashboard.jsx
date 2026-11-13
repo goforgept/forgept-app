@@ -21,7 +21,7 @@ const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
 
 // ─── Widget: Revenue Metrics ─────────────────────────────────────────────────
 
-function RevenueMetricsWidget({ proposals }) {
+function RevenueMetricsWidget({ proposals, dateRangeParam }) {
   const navigate = useNavigate()
   const won    = proposals.filter(p => p.status === 'Won')
   const lost   = proposals.filter(p => p.status === 'Lost')
@@ -41,9 +41,10 @@ function RevenueMetricsWidget({ proposals }) {
     : null
   const last30 = proposals.filter(p => new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
 
+  const dr = dateRangeParam ? `&dateRange=${dateRangeParam}` : ''
   const cards = [
-    { label: 'Active Pipeline',    value: fmt(activeVal),  color: 'text-fp-text',    href: '/proposals?status=active' },
-    { label: 'Total Won',          value: fmt(wonVal),     color: 'text-green-400',  href: '/proposals?status=Won' },
+    { label: 'Active Pipeline',    value: fmt(activeVal),  color: 'text-fp-text',    href: `/proposals?status=active${dr}` },
+    { label: 'Total Won',          value: fmt(wonVal),     color: 'text-green-400',  href: `/proposals?status=Won${dr}` },
     { label: 'Win Rate',           value: winRate !== null ? `${winRate}%` : '—', color: 'text-fp-brand' },
     { label: 'Avg Deal Size',      value: fmt(avgDeal),    color: 'text-blue-400' },
     { label: 'Avg Margin',         value: avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—', color: 'text-purple-400' },
@@ -69,7 +70,7 @@ function RevenueMetricsWidget({ proposals }) {
 
 // ─── Widget: Pipeline by Stage ────────────────────────────────────────────────
 
-function PipelineStageWidget({ proposals }) {
+function PipelineStageWidget({ proposals, dateRangeParam }) {
   const navigate = useNavigate()
   const stages = ['Draft', 'Sent', 'Won', 'Lost']
   const data = stages.map(s => ({
@@ -106,7 +107,7 @@ function PipelineStageWidget({ proposals }) {
       <div className="grid grid-cols-4 gap-3 mt-4 pt-3 border-t border-fp-border/50">
         {data.map(d => (
           <div key={d.stage} className="text-center cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={() => navigate(`/proposals?status=${d.stage}`)}>
+            onClick={() => navigate(`/proposals?status=${d.stage}${dateRangeParam ? `&dateRange=${dateRangeParam}` : ''}`)}>
             <p className="text-fp-text text-2xl font-bold">{d.count}</p>
             <p style={{ color: STATUS_COLOR[d.stage] }} className="text-xs font-semibold mt-0.5">{d.stage}</p>
           </div>
@@ -495,12 +496,15 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const fullWidgets  = visibleDefs.filter(d => d.full)
   const halfWidgets  = visibleDefs.filter(d => !d.full)
 
+  const periodToDateRange = { this_month: 'mtd', this_quarter: 'qtd', this_year: 'ytd' }
+  const dateRangeParam = periodToDateRange[dashboardPeriod] || null
+
   const renderWidget = (id) => {
     switch (id) {
       case 'revenue-metrics':
-        return <RevenueMetricsWidget key={id} proposals={periodProposals} />
+        return <RevenueMetricsWidget key={id} proposals={periodProposals} dateRangeParam={dateRangeParam} />
       case 'pipeline-stage':
-        return <PipelineStageWidget key={id} proposals={periodProposals} />
+        return <PipelineStageWidget key={id} proposals={periodProposals} dateRangeParam={dateRangeParam} />
       case 'kpi-metrics':
         return (
           <div key={id} className="bg-fp-card rounded-xl p-5 border border-fp-border/40">

@@ -39,6 +39,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     const params = new URLSearchParams(location.search)
     const status = params.get('status')
     const rep = params.get('rep')
+    const dr = params.get('dateRange')
 
     if (status === 'Won') setStatusFilters(new Set(['Won']))
     else if (status === 'Lost') setStatusFilters(new Set(['Lost']))
@@ -46,6 +47,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     else if (status === 'Sent') setStatusFilters(new Set(['Sent']))
     else if (status === 'active') setStatusFilters(new Set(['Draft', 'Sent']))
     if (rep) setSearch(rep)
+    if (dr && ['mtd', 'qtd', 'ytd'].includes(dr)) setDateRange(dr)
   }, [])
 
   const fetchOrgAndProposals = async () => {
