@@ -61,7 +61,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
-      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,quote_expires_at,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
@@ -250,6 +250,14 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       if (p.status !== 'Draft') return false
       return Math.floor((new Date() - new Date(p.created_at)) / (1000 * 60 * 60 * 24)) >= 3
     }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  , [proposals])
+
+  const expiredQuotes = useMemo(() =>
+    proposals.filter(p => {
+      if (p.status !== 'Sent') return false
+      if (!p.quote_expires_at) return false
+      return new Date(p.quote_expires_at) < new Date()
+    }).sort((a, b) => new Date(a.quote_expires_at) - new Date(b.quote_expires_at))
   , [proposals])
 
   const [expiredPricingCount, setExpiredPricingCount] = useState(0)
@@ -795,6 +803,36 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                       {p.company && <span className="text-red-400/70 text-xs ml-2">· {p.company}</span>}
                     </div>
                     <span className="text-red-400/50 group-hover:text-red-400 text-xs transition-colors">View →</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {!loading && expiredQuotes.length > 0 && (
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-orange-400">⏰</span>
+              <div>
+                <p className="text-fp-text font-semibold text-sm">Expired Quotes</p>
+                <p className="text-orange-400 text-xs">{expiredQuotes.length} sent proposal{expiredQuotes.length !== 1 ? 's' : ''} {expiredQuotes.length !== 1 ? 'have' : 'has'} passed their expiry date — follow up or re-send</p>
+              </div>
+            </div>
+            <div className="space-y-1 pl-6">
+              {expiredQuotes.map(p => {
+                const daysAgo = Math.floor((new Date() - new Date(p.quote_expires_at)) / (1000 * 60 * 60 * 24))
+                return (
+                  <button key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
+                    className="w-full text-left flex items-center justify-between bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 rounded-lg px-3 py-2 transition-colors group">
+                    <div>
+                      <span className="text-fp-text text-xs font-semibold">{p.proposal_name || 'Untitled'}</span>
+                      {p.company && <span className="text-orange-400/70 text-xs ml-2">· {p.company}</span>}
+                      {p.rep_name && <span className="text-fp-muted text-xs ml-2">· {p.rep_name}</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-orange-400 text-xs">{daysAgo === 0 ? 'Expired today' : `${daysAgo}d ago`}</span>
+                      <span className="text-orange-400/50 group-hover:text-orange-400 text-xs transition-colors">View →</span>
+                    </div>
                   </button>
                 )
               })}
