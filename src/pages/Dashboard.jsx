@@ -345,7 +345,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
     const [proposalsRes, targetRes, invoicesRes, posRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profileData.org_id).eq('user_id', user.id).eq('is_current_revision', true).neq('is_archived', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('org_id', profileData.org_id).eq('user_id', user.id).eq('is_current_revision', true).is('archived_at', null).order('created_at', { ascending: false }),
       supabase.from('targets').select('*').eq('profile_id', user.id).eq('period', 'monthly').gte('period_start', monthStart).maybeSingle(),
       supabase.from('invoices').select('*').eq('org_id', profileData.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profileData.org_id),
@@ -360,7 +360,8 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
         .from('proposals')
         .select('id, proposal_name, company, rep_name, status, proposal_value, subtotal_value, created_at')
         .eq('org_id', profileData.org_id)
-        .neq('is_archived', true)
+        .eq('is_current_revision', true)
+        .is('archived_at', null)
         .order('created_at', { ascending: false })
       setOrgProposals(orgProps || [])
     }

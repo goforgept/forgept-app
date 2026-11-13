@@ -8,6 +8,7 @@ const NOTIFICATION_TYPES = [
   { type: 'ticket_overdue',     label: 'Service ticket overdue',   icon: '🔧' },
   { type: 'invoice_overdue',    label: 'Invoice overdue',          icon: '⚠️' },
   { type: 'proposal_past_close',label: 'Proposal past close date', icon: '📋' },
+  { type: 'quote_expired',      label: 'Quote expired',            icon: '⏳' },
   { type: 'email_opened',       label: 'Email opened',             icon: '✉️' },
   { type: 'proposal_sent',      label: 'Proposal sent',            icon: '📄' },
   { type: 'invoice_sent',       label: 'Invoice sent',             icon: '🧾' },

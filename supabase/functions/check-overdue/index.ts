@@ -155,7 +155,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 4. OVERDUE TASKS ──────────────────────────────────────────────────
+    // ── 4. EXPIRED QUOTES ─────────────────────────────────────────────────
+    const { data: expiredQuotes } = await supabase
+      .from('proposals')
+      .select('id, quote_number, proposal_name, company, client_name, org_id, assigned_to, rep_name, quote_expires_at')
+      .eq('status', 'Sent')
+      .not('quote_expires_at', 'is', null)
+
+    for (const p of (expiredQuotes || [])) {
+      const ot = orgTime[p.org_id]
+      if (!ot) continue
+      const expiryDate = p.quote_expires_at.slice(0, 10)
+      if (expiryDate >= ot.today) continue
+      if (ot.hour !== '06') continue
+      const client = p.company || p.client_name || 'Unknown'
+      for (const userId of (adminsByOrg[p.org_id] || [])) {
+        allNotifications.push({
+          org_id: p.org_id, user_id: userId,
+          type: 'quote_expired', title: 'Quote Expired',
+          body: `Quote "${p.proposal_name || ''}" for ${client} expired on ${expiryDate} and is still open.`,
+          link: `/proposal/${p.id}`,
+          dedup_key: `expired:quote:${p.id}:${ot.today}`,
+        })
+      }
+    }
+
+    // ── 5. OVERDUE TASKS ──────────────────────────────────────────────────
     const { data: tasks } = await supabase
       .from('tasks')
       .select('id, title, org_id, assigned_to, due_date, start_time')
@@ -197,7 +222,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 5. TASKS DUE NOW (within current hour window) ─────────────────────
+    // ── 6. TASKS DUE NOW (within current hour window) ─────────────────────
     // Hourly cron: find tasks due today at a start_time within the current hour
     for (const task of (tasks || [])) {
       if (!task.start_time) continue

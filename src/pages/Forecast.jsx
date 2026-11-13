@@ -20,7 +20,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const fetchData = async () => {
     if (!profile?.org_id) { setLoading(false); return }
-    let proposalsQuery = supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false })
+    let proposalsQuery = supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).is('archived_at', null).order('created_at', { ascending: false })
     if (scope('pipeline') === 'own') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
 
     const [proposalsRes, stagesRes] = await Promise.all([
@@ -53,7 +53,8 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       d.setMonth(d.getMonth() - i)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      const won = proposals.filter(p => p.status === 'Won' && p.created_at?.startsWith(key)).reduce((sum, p) => sum + pval(p), 0)
+      // Use updated_at to bucket won proposals by when they were actually closed
+      const won = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at)?.startsWith(key)).reduce((sum, p) => sum + pval(p), 0)
       const total = proposals.filter(p => p.created_at?.startsWith(key)).reduce((sum, p) => sum + pval(p), 0)
       months.push({ key, label, won, total })
     }
@@ -93,7 +94,8 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const closeRateByMonth = useMemo(() => {
     return monthlyWon.map(m => {
       const total = proposals.filter(p => p.created_at?.startsWith(m.key)).length
-      const won = proposals.filter(p => p.status === 'Won' && p.created_at?.startsWith(m.key)).length
+      // Use updated_at for won to match when the deal was actually closed
+      const won = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at)?.startsWith(m.key)).length
       return { ...m, rate: total > 0 ? Math.round((won / total) * 100) : 0, total }
     })
   }, [monthlyWon, proposals])
@@ -107,8 +109,8 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       repMap[rep].pipeline += pval(p)
       repMap[rep].count += 1
     })
-    // All-time won — always shown regardless of filter
-    proposals.filter(p => p.status === 'Won').forEach(p => {
+    // YTD won — bucketed by updated_at so it reflects when the deal was closed
+    proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at) >= ytdStart).forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
       repMap[rep].won += pval(p)
@@ -117,7 +119,9 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   }, [filteredProposals, proposals])
 
   const totalActivePipeline = filteredProposals.reduce((sum, p) => sum + pval(p), 0)
-  const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + pval(p), 0)
+  const ytdStart = `${new Date().getFullYear()}-01-01`
+  const totalWon = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at) >= ytdStart).reduce((sum, p) => sum + pval(p), 0)
+  const totalWonCount = proposals.filter(p => p.status === 'Won' && (p.updated_at || p.created_at) >= ytdStart).length
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
 
@@ -160,7 +164,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Won YTD</p>
             <p className="text-green-400 text-2xl font-bold">${fmt(totalWon)}</p>
-            <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status === 'Won').length} deals closed</p>
+            <p className="text-fp-muted text-xs mt-1">{totalWonCount} deals closed</p>
           </div>
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Closing {dayRange === 'all' ? 'Upcoming' : `in ${dayRange}d`}</p>
