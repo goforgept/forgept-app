@@ -248,6 +248,21 @@ export default function ProposalHeader({
             </span>
             Proposal Sent
           </button>
+          {isSent && (
+            <div className="flex items-center gap-1 mt-1">
+              {canEdit ? (
+                <input
+                  type="date"
+                  value={proposal?.sent_at ? proposal.sent_at.slice(0, 10) : ''}
+                  onChange={e => updateSentAt?.(e.target.value)}
+                  className="bg-transparent text-blue-400/70 text-[11px] border-none outline-none cursor-pointer w-[120px]"
+                  title="Sent date — used for MTD/QTD/YTD filtering"
+                />
+              ) : (
+                proposal?.sent_at && <span className="text-blue-400/70 text-[11px]">{proposal.sent_at.slice(0, 10)}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -359,16 +374,6 @@ export default function ProposalHeader({
           )}
         </Cell>
 
-        {(proposal?.status === 'Sent' || proposal?.sent_at) && (
-          <Cell label="Sent Date" className="min-w-[120px]">
-            {canEdit ? (
-              <input type="date" value={proposal?.sent_at ? proposal.sent_at.slice(0, 10) : ''} onChange={e => updateSentAt?.(e.target.value)}
-                className={`${inputCls} cursor-pointer`} />
-            ) : (
-              <span className="text-fp-text text-sm font-medium">{proposal?.sent_at ? proposal.sent_at.slice(0, 10) : '—'}</span>
-            )}
-          </Cell>
-        )}
 
         <Cell label="Industry" className="min-w-[110px]">
           {canEdit && updateIndustry ? (
