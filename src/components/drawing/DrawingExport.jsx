@@ -2038,7 +2038,17 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 32, bottom: outerM + 4 },
         }
 
-        // Cable type comes from rise_cable_type set in device settings (Runs To section)
+        // Build cable type lookup: placement id → unique cable types from drawn runs
+        const placementCableTypes = {}
+        cableRuns.forEach(r => {
+          if (r.cable_type) {
+            ;[r.from_placement_id, r.to_placement_id].forEach(pid => {
+              if (!pid) return
+              if (!placementCableTypes[pid]) placementCableTypes[pid] = new Set()
+              placementCableTypes[pid].add(r.cable_type)
+            })
+          }
+        })
 
         // Sort placements by category then by device_address for readable grouping
         const schedSorted = [...placements].sort((a, b) => {
@@ -2069,7 +2079,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           groupSeq++
           const sht   = sheets.find(s => s.id === p.drawing_sheet_id)
           const comps = (compByPlacement[p.id] || []).join(', ') || '—'
-          const cable = p.rise_cable_type || '—'
+          const runTypes = [...(placementCableTypes[p.id] || [])]
+          const cableTypes = [...new Set([...(p.rise_cable_type ? [p.rise_cable_type] : []), ...runTypes])]
+          const cable = cableTypes.length ? cableTypes.join(', ') : '—'
           scheduleRows.push([
             groupSeq,
             p.device_address || '—',
