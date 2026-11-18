@@ -8,7 +8,10 @@ import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
 
 // ── SheetCanvas ────────────────────────────────────────────────────────────────
-function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, onNoteClick, selectedNoteId, shareToken }) {
+const ROOM_COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }
+const ROOM_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
+
+function SheetCanvas({ sheet, placements, rooms = [], comments, addingNote, onCanvasClick, onNoteClick, selectedNoteId, shareToken }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   const isPanning    = useRef(false)
@@ -278,6 +281,27 @@ function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, o
               })}
             </Layer>
 
+            {/* IDF / MDF / HE room markers */}
+            <Layer listening={false}>
+              {rooms.filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_COLORS[r.room_type]).map(room => {
+                const col  = ROOM_COLORS[room.room_type]
+                const abbr = ROOM_ABBREV[room.room_type]
+                const px   = position.x + room.x * canvasW * scale
+                const py   = position.y + room.y * canvasH * scale
+                const ls   = (room.label_scale || 1) * scale
+                const W = 130 * ls, H = 30 * ls, BADGE = 34 * ls
+                return (
+                  <Group key={room.id} x={px} y={py}>
+                    <Rect x={2*ls} y={2*ls} width={W} height={H} fill="rgba(0,0,0,0.4)" cornerRadius={5*ls} />
+                    <Rect x={0} y={0} width={W} height={H} fill="#0d1927" stroke={col} strokeWidth={1.5} cornerRadius={5*ls} />
+                    <Rect x={0} y={0} width={BADGE} height={H} fill={col+'33'} cornerRadius={[5*ls,0,0,5*ls]} />
+                    <Text x={0} y={0} width={BADGE} height={H} text={abbr} fontSize={9*ls} fontStyle="bold" fill={col} align="center" verticalAlign="middle" />
+                    <Text x={BADGE+5*ls} y={0} width={W-BADGE-8*ls} height={H} text={room.name} fontSize={11*ls} fontStyle="bold" fill="#ffffff" verticalAlign="middle" />
+                  </Group>
+                )
+              })}
+            </Layer>
+
             {/* Note pins */}
             <Layer>
               {comments.map((c, idx) => {
@@ -319,6 +343,7 @@ export default function DrawingReview() {
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
   const [approved,      setApproved]      = useState(false)
+  const [rooms,         setRooms]         = useState([])
 
   const [activeSheetId, setActiveSheetId] = useState(null)
   const [comments,      setComments]      = useState([])
@@ -376,6 +401,11 @@ export default function DrawingReview() {
       setPlacements(sorted)
       setOrgProfile(profileData)
       setComments(commentData || [])
+      // Load IDF/MDF/HE room markers
+      const { data: roomData } = await supabase
+        .from('rooms').select('id, name, room_type, x, y, drawing_sheet_id, label_scale')
+        .eq('proposal_id', pkgData.proposal_id)
+      setRooms((roomData || []).filter(r => ['idf','mdf','headend'].includes(r.room_type)))
     } catch { setError('Failed to load drawing review.') }
     finally { setLoading(false) }
   }
@@ -573,6 +603,7 @@ export default function DrawingReview() {
             <SheetCanvas
               sheet={activeSheet}
               placements={sheetPlacements}
+              rooms={rooms}
               comments={sheetComments}
               addingNote={addingNote}
               onCanvasClick={handleCanvasClick}

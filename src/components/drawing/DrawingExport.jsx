@@ -156,8 +156,40 @@ const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = []
   meta.forEach((line, i) => pdf.text(line, margin, midY + (subtitle ? 24 : 14) + i * 7))
 }
 
+const ROOM_MARKER_TYPES = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }
+const ROOM_MARKER_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
+
+// Draws IDF/MDF/HE room markers onto a PDF page
+const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
+  const sheetRooms = (rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_MARKER_TYPES[r.room_type])
+  if (!sheetRooms.length) return
+  const W = Math.max(imgW * 0.14, 20), H = 6.5, BADGE = W * 0.27
+  for (const room of sheetRooms) {
+    const px = imgX + room.x * imgW, py = imgY + room.y * imgH
+    const hex = ROOM_MARKER_TYPES[room.room_type]
+    const cr = parseInt(hex.slice(1,3),16), cg = parseInt(hex.slice(3,5),16), cb = parseInt(hex.slice(5,7),16)
+    // shadow
+    pdf.setFillColor(0,0,0); pdf.saveGraphicsState(); pdf.setGState(pdf.GState({ opacity: 0.25 }))
+    pdf.roundedRect(px + 0.5, py + 0.5, W, H, 1.2, 1.2, 'F'); pdf.restoreGraphicsState()
+    // main body
+    pdf.setFillColor(13, 25, 39); pdf.setDrawColor(cr, cg, cb); pdf.setLineWidth(0.5)
+    pdf.roundedRect(px, py, W, H, 1.2, 1.2, 'FD')
+    // badge fill
+    pdf.saveGraphicsState(); pdf.setGState(pdf.GState({ opacity: 0.2 }))
+    pdf.setFillColor(cr, cg, cb); pdf.roundedRect(px, py, BADGE, H, 1.2, 1.2, 'F'); pdf.restoreGraphicsState()
+    // badge text
+    pdf.setTextColor(cr, cg, cb); pdf.setFontSize(5); pdf.setFont('helvetica', 'bold')
+    pdf.text(ROOM_MARKER_ABBREV[room.room_type], px + BADGE / 2, py + H / 2 + 0.9, { align: 'center' })
+    // room name
+    pdf.setTextColor(255, 255, 255); pdf.setFontSize(5.5); pdf.setFont('helvetica', 'bold')
+    const nameX = px + BADGE + 2, maxW = W - BADGE - 3
+    const name = pdf.splitTextToSize(room.name || '', maxW)[0] || ''
+    pdf.text(name, nameX, py + H / 2 + 0.9)
+  }
+}
+
 // Draws device icons, FOV overlays, cable runs, and pathways onto a rendered floor plan page
-const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, placementsBySheet, showFOV = true, cableRunsBySheet = {}, pathwaysBySheet = {}, showCables = true, showPathways = true) => {
+const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, placementsBySheet, showFOV = true, cableRunsBySheet = {}, pathwaysBySheet = {}, showCables = true, showPathways = true, rooms = []) => {
   pdf.setFillColor(255, 255, 255); pdf.rect(imgX, imgY, imgW, imgH, 'F')
   let imgNaturalW = null
   if (imgData) {
@@ -262,6 +294,7 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
       pdf.text(label, lx, ly, { align: 'center' })
     }
   }
+  drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH)
 }
 
 const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
@@ -522,7 +555,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     pdf.text(sheet.name, margin, 7)
     const imgY = 12, imgH = pageH - imgY - titleBlockH - margin - 5, imgW = pageW - margin*2
     const imgData = await getFloorPlanImageFromR2(sheet.id, sheets)
-    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways)
+    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways, rooms)
     drawTitleBlock(sheet.name, i+4)
   }
 
@@ -1012,6 +1045,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(label, lx, ly, { align: 'center' })
       }
     }
+    drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH)
   }
 
   // ── Load org logo safely — resolves R2 path to signed URL first
