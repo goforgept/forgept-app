@@ -206,6 +206,11 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
     setItemComponents(prev => prev.filter(c => c.id !== id))
   }
 
+  const updateItemComponent = (id, field, value) => {
+    setItemComponents(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+    supabase.from('rack_item_components').update({ [field]: value }).eq('id', id)
+  }
+
   const addItem = async (rackId, uStart, product, uSize = 1, customLabel = null) => {
     const gp = product?.source === 'global' ? product : null
     const rack = racks.find(r => r.id === rackId)
@@ -467,6 +472,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
             itemComponents={itemComponents.filter(c => c.rack_item_id === selectedItem.id)}
             addItemComponent={addItemComponent}
             deleteItemComponent={deleteItemComponent}
+            updateItemComponent={updateItemComponent}
             onUpdate={updateItem}
             onDelete={deleteItem}
             onClose={() => setSelectedItemId(null)}
@@ -733,7 +739,7 @@ const ITEM_COMPONENT_TYPES = [
 ]
 
 
-function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents = [], addItemComponent, deleteItemComponent, onUpdate, onDelete, onClose }) {
+function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents = [], addItemComponent, deleteItemComponent, updateItemComponent, onUpdate, onDelete, onClose }) {
   const getInitialForm = (i) => ({
     label:             i.label             || '',
     description:       i.description       || '',
@@ -1100,25 +1106,44 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
 
           {/* Existing components list */}
           {itemComponents.length > 0 && (
-            <div className="space-y-1 mb-2">
+            <div className="space-y-2 mb-2">
               {itemComponents.map(c => (
-                <div key={c.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg group" style={{ background: '#0a1220', border: '1px solid #1a2d40' }}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-semibold" style={{ color: '#8A9AB0' }}>{c.component_type}</span>
-                      {c.quantity > 1 && <span className="text-[10px] font-bold px-1 rounded" style={{ background: '#C8622A22', color: '#C8622A' }}>×{c.quantity}</span>}
-                    </div>
-                    {c.name && <p className="text-xs text-white truncate mt-0.5">{c.name}</p>}
-                    {c.part_number && <p className="text-[10px] font-mono truncate" style={{ color: '#4a6080' }}>{c.part_number}</p>}
-                    {c.manufacturer && <p className="text-[10px] truncate" style={{ color: '#4a6080' }}>{c.manufacturer}</p>}
+                <div key={c.id} className="rounded-lg p-2 group" style={{ background: '#0a1220', border: '1px solid #1a2d40' }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[#C8622A] text-xs font-medium">{c.component_type}</span>
+                    {deleteItemComponent && (
+                      <button onClick={() => deleteItemComponent(c.id)}
+                        className="opacity-0 group-hover:opacity-100 text-xs hover:text-red-400 transition-all"
+                        style={{ color: '#2a4060' }}>✕</button>
+                    )}
                   </div>
-                  {deleteItemComponent && (
-                    <button
-                      onClick={() => deleteItemComponent(c.id)}
-                      className="opacity-0 group-hover:opacity-100 text-xs flex-shrink-0 hover:text-red-400 transition-all"
-                      style={{ color: '#2a4060' }}
-                    >✕</button>
-                  )}
+                  <div className="space-y-1">
+                    <input type="text" placeholder="Name / description"
+                      value={c.name || ''}
+                      onChange={e => updateItemComponent?.(c.id, 'name', e.target.value)}
+                      onBlur={e => updateItemComponent?.(c.id, 'name', e.target.value)}
+                      className={ic} style={icStyle} />
+                    <div className="flex gap-1">
+                      <input type="text" placeholder="Part #"
+                        value={c.part_number || ''}
+                        onChange={e => updateItemComponent?.(c.id, 'part_number', e.target.value)}
+                        onBlur={e => updateItemComponent?.(c.id, 'part_number', e.target.value)}
+                        className={ic} style={icStyle} />
+                      <input type="text" placeholder="Mfr"
+                        value={c.manufacturer || ''}
+                        onChange={e => updateItemComponent?.(c.id, 'manufacturer', e.target.value)}
+                        onBlur={e => updateItemComponent?.(c.id, 'manufacturer', e.target.value)}
+                        className="w-20 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" style={icStyle} />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs" style={{ color: '#8A9AB0' }}>Qty:</span>
+                      <input type="number" min="1"
+                        value={c.quantity || 1}
+                        onChange={e => updateItemComponent?.(c.id, 'quantity', parseInt(e.target.value) || 1)}
+                        onBlur={e => updateItemComponent?.(c.id, 'quantity', parseInt(e.target.value) || 1)}
+                        className="w-14 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C8622A] text-center" style={icStyle} />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
