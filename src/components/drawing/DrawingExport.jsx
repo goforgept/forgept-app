@@ -159,23 +159,20 @@ const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = []
 const ROOM_MARKER_TYPES = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }
 const ROOM_MARKER_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
 
-// Draws IDF/MDF/HE room markers onto a PDF page as compact text labels
+// Draws IDF/MDF/HE room markers onto a PDF page as small colored squares with abbreviation
 const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
   const sheetRooms = (rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_MARKER_TYPES[r.room_type])
   if (!sheetRooms.length) return
+  const S = 7 // square size in mm
   for (const room of sheetRooms) {
     const px = imgX + room.x * imgW, py = imgY + room.y * imgH
     const hex = ROOM_MARKER_TYPES[room.room_type]
     const cr = parseInt(hex.slice(1,3),16), cg = parseInt(hex.slice(3,5),16), cb = parseInt(hex.slice(5,7),16)
     const abbr = ROOM_MARKER_ABBREV[room.room_type]
-    const label = room.name ? `${abbr}: ${room.name}` : abbr
-    pdf.setFontSize(6); pdf.setFont('helvetica', 'bold')
-    const tw = pdf.getTextWidth(label) + 2.5
-    // small pill background
     pdf.setFillColor(cr, cg, cb)
-    pdf.roundedRect(px - 1.2, py - 3.5, tw, 4.5, 0.8, 0.8, 'F')
-    pdf.setTextColor(255, 255, 255)
-    pdf.text(label, px, py, { baseline: 'bottom' })
+    pdf.rect(px - S/2, py - S/2, S, S, 'F')
+    pdf.setTextColor(255, 255, 255); pdf.setFontSize(5); pdf.setFont('helvetica', 'bold')
+    pdf.text(abbr, px, py + 0.9, { align: 'center' })
   }
 }
 
@@ -549,7 +546,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     const runTypes = [...(placementCableTypes[p.id] || [])]
     const cableTypes = [...new Set([...(p.rise_cable_type ? [p.rise_cable_type] : []), ...runTypes])]
     const cable = cableTypes.length ? cableTypes.join(', ') : '—'
-    scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), cable, sht?.name||'—', p.runs_to_label||'—', comps])
+    scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), sht?.name||'—', p.runs_to_label||'—', cable, comps])
   })
 
   // Rack items grouped by room → rack
@@ -574,12 +571,12 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
       scheduleRows.push([{ content: `  ${rack.name || 'Rack'}`, colSpan: 11, styles: { fillColor: [230,230,230], textColor: [40,40,40], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 6, top: 1, bottom: 1, right: 2 } } }])
       items.forEach((item, idx) => {
         const comps = (compByRackItem[item.id] || []).join(', ') || '—'
-        scheduleRows.push([idx+1, item.label||'—', item.part_number||item.model||'—', item.description||item.label||'—', item.manufacturer||'—', item.quantity||1, '—', '—', `${roomName} / ${rack.name||'Rack'}`, '—', comps])
+        scheduleRows.push([idx+1, item.label||'—', item.part_number||item.model||'—', item.description||item.label||'—', item.manufacturer||'—', item.quantity||1, '—', `${roomName} / ${rack.name||'Rack'}`, '—', '—', comps])
       })
     })
   }
 
-  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Cable','Sheet','Runs To','Components']], body: scheduleRows, columnStyles: { 10: { cellWidth: 50 } } })
+  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Sheet','Runs To','Cable','Components']], body: scheduleRows, columnStyles: { 10: { cellWidth: 50 } } })
 
   // Cable schedule — inline below device schedule, same style
   const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
