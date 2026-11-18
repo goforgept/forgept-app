@@ -31,7 +31,7 @@ const LABEL_PREFIXES = {
   'Intercom':            'INT',
   'Gate Intercom':       'INT',
   'Video Intercom':      'INT',
-  'Master Station':      'MS',
+  'Master Station':      'IMS',
   'NVR':                 'NVR',
   'Speaker':             'SPK',
   'Ceiling Speaker':     'SPK',
