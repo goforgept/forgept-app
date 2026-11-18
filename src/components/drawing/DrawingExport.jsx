@@ -1970,10 +1970,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
 
       const pageList   = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
-      const usedCategories = [...new Set(placements.map(p => p.global_products?.category).filter(Boolean))].sort()
+      const usedCategories = [...new Set([
+        ...placements.map(p => p.global_products?.category),
+        ...rackItemsData.map(i => i.global_products?.category || i.category),
+      ].filter(Boolean))].sort()
       // Tally total page count for SHEET X OF Y
       const coverPages  = archIncludeCover ? 1 : 0
-      const schedPages  = archIncludeSchedule && placements.length > 0 ? 1 : 0
+      const schedPages  = archIncludeSchedule && (placements.length > 0 || rackItemsData.length > 0) ? 1 : 0
       const legendPages = usedCategories.length > 0 ? 1 : 0
       const totalPages  = coverPages + schedPages + legendPages + pageList.length
 
@@ -2021,7 +2024,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
 
       // ── DEVICE SCHEDULE PAGE ─────────────────────────────────────────────────
-      if (archIncludeSchedule && placements.length > 0) {
+      if (archIncludeSchedule && (placements.length > 0 || rackItemsData.length > 0)) {
         if (archIncludeCover) pdf.addPage()
 
         // willDrawPage fires before each table page (including page 1); didDrawPage fires after.
