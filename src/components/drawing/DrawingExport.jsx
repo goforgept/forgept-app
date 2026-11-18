@@ -2039,14 +2039,22 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
 
         // Build cable type lookup: placement id → unique cable types from drawn runs
+        // Reads placement_id from each point in the run's points array (always present)
+        // and also from from_placement_id / to_placement_id columns when available.
         const placementCableTypes = {}
+        const addCableType = (pid, type) => {
+          if (!pid || !type) return
+          if (!placementCableTypes[pid]) placementCableTypes[pid] = new Set()
+          placementCableTypes[pid].add(type)
+        }
         cableRuns.forEach(r => {
-          if (r.cable_type) {
-            ;[r.from_placement_id, r.to_placement_id].forEach(pid => {
-              if (!pid) return
-              if (!placementCableTypes[pid]) placementCableTypes[pid] = new Set()
-              placementCableTypes[pid].add(r.cable_type)
-            })
+          if (!r.cable_type) return
+          // from_placement_id / to_placement_id columns (may be absent on older rows)
+          addCableType(r.from_placement_id, r.cable_type)
+          addCableType(r.to_placement_id, r.cable_type)
+          // points JSONB array — each point may carry placement_id
+          if (Array.isArray(r.points)) {
+            r.points.forEach(pt => addCableType(pt?.placement_id, r.cable_type))
           }
         })
 
