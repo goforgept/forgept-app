@@ -726,6 +726,8 @@ const ITEM_COMPONENT_TYPES = [
   'SFP Module', 'SFP+ Module', 'Power Supply (Hot Swap)', 'Fan Module',
   'Hard Drive / SSD', 'Line Card', 'Expansion Card / NIC',
   'Transceiver', 'License Key', 'USB / Console Adapter',
+  // Gate / Intercom
+  'Pedestal', 'Post Mount', 'Gate Operator Interface',
   // General
   'UPS Battery', 'PDU', 'Rail Kit', 'Other',
 ]
@@ -740,6 +742,8 @@ const ITEM_QUICK_COMPONENTS = {
   'Network':                  ['SFP Module', 'SFP+ Module', 'Power Supply (Hot Swap)', 'Fan Module', 'License Key'],
   'UPS':                      ['UPS Battery', 'PDU', 'Rail Kit'],
   'Power Supply':             ['Battery 12V 7Ah', 'Battery 12V 12Ah', 'Surge Protector'],
+  'Gate Intercom':            ['Pedestal', 'Post Mount', 'Power Supply', 'Electric Strike', 'Gate Operator Interface', 'Surge Protector'],
+  'Intercom':                 ['Power Supply', 'Back Box', 'Electric Strike', 'Door Release', 'Surge Protector'],
 }
 
 function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents = [], addItemComponent, deleteItemComponent, onUpdate, onDelete, onClose }) {

@@ -23,6 +23,7 @@ const DEFAULT_COMPONENTS = {
   'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Surge Protector', 'Relay Module'],
   'Motion Sensor':       ['Back Box', 'Surge Protector'],
   'Intercom':            ['Power Supply', 'Back Box', 'Electric Strike', 'Door Release', 'Surge Protector'],
+  'Gate Intercom':       ['Pedestal', 'Post Mount', 'Power Supply', 'Back Box', 'Electric Strike', 'Gate Operator Interface', 'Surge Protector'],
   'Sensor':              ['Back Box', 'Power Supply', 'Surge Protector'],
   'Wireless Lock':       ['Battery Pack', 'Wireless Gateway', 'Credential', 'Door Coordinator'],
   'Guard Tour':          ['Charging Cradle', 'Software License'],
