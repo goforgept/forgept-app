@@ -160,10 +160,10 @@ const ROOM_MARKER_TYPES = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }
 const ROOM_MARKER_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
 
 // Draws IDF/MDF/HE room markers onto a PDF page as small colored squares with abbreviation
-const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
+const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH, imgNaturalW = null) => {
   const sheetRooms = (rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_MARKER_TYPES[r.room_type])
   if (!sheetRooms.length) return
-  const S = 7 // square size in mm
+  const S = imgNaturalW ? Math.max(32 * (imgW / imgNaturalW), 2) : 4
   for (const room of sheetRooms) {
     const px = imgX + room.x * imgW, py = imgY + room.y * imgH
     const hex = ROOM_MARKER_TYPES[room.room_type]
@@ -171,8 +171,8 @@ const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
     const abbr = ROOM_MARKER_ABBREV[room.room_type]
     pdf.setFillColor(cr, cg, cb)
     pdf.rect(px - S/2, py - S/2, S, S, 'F')
-    pdf.setTextColor(255, 255, 255); pdf.setFontSize(5); pdf.setFont('helvetica', 'bold')
-    pdf.text(abbr, px, py + 0.9, { align: 'center' })
+    pdf.setTextColor(255, 255, 255); pdf.setFontSize(Math.max(S * 0.9, 3)); pdf.setFont('helvetica', 'bold')
+    pdf.text(abbr, px, py + S * 0.18, { align: 'center' })
   }
 }
 
@@ -282,7 +282,7 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
       pdf.text(label, lx, ly, { align: 'center' })
     }
   }
-  drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH)
+  drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH, imgNaturalW)
 }
 
 const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
@@ -1116,7 +1116,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(label, lx, ly, { align: 'center' })
       }
     }
-    drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH)
+    drawRoomMarkersOnPDF(pdf, sheet, rooms, imgX, imgY, imgW, imgH, imgNaturalW)
   }
 
   // ── Load org logo safely — resolves R2 path to signed URL first
