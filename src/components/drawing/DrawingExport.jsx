@@ -290,7 +290,7 @@ const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
 }
 
 // Exported so ProposalDetail can call it for the bundle download
-export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways = [], orgProfile, proposal, exportFOV = true, exportCables = true, exportPathways = true }) {
+export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways = [], orgProfile, proposal, exportFOV = true, exportCables = true, exportPathways = true, rackItemsData = [], rackList = [], rooms = [] }) {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
@@ -1436,7 +1436,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const handleShopDrawing = async () => {
     setGenerating(true)
     try {
-      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways })
+      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways, rackItemsData, rackList, rooms })
       await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
     } catch (err) {
       console.error('Shop drawing failed:', err)
@@ -2095,6 +2095,76 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             comps,
           ])
         })
+
+        // Add rack items grouped by room → rack
+        if (rackItemsData && rackItemsData.length > 0) {
+          scheduleRows.push([{
+            content: 'ROOMS / RACK EQUIPMENT',
+            colSpan: NUM_COLS,
+            styles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fs(7), halign: 'left', cellPadding: { left: fs(2), top: fs(1.2), bottom: fs(1.2), right: fs(2) } },
+          }])
+
+          // Group rack items by room
+          const roomMap = {}
+          rooms.forEach(room => { roomMap[room.id] = room })
+          const rackMap = {}
+          rackList.forEach(rack => { rackMap[rack.id] = rack })
+
+          // Group items by rack
+          const itemsByRack = {}
+          rackItemsData.forEach(item => {
+            if (!itemsByRack[item.rack_id]) itemsByRack[item.rack_id] = []
+            itemsByRack[item.rack_id].push(item)
+          })
+
+          // Sort racks by room name then rack name
+          const sortedRacks = [...rackList].sort((a, b) => {
+            const roomA = roomMap[a.room_id]?.name || ''
+            const roomB = roomMap[b.room_id]?.name || ''
+            if (roomA !== roomB) return roomA.localeCompare(roomB)
+            return (a.name || '').localeCompare(b.name || '')
+          })
+
+          let lastRoom = null
+          sortedRacks.forEach(rack => {
+            const items = itemsByRack[rack.id]
+            if (!items || items.length === 0) return
+            const room = roomMap[rack.room_id]
+            const roomName = room?.name || 'Unknown Room'
+
+            if (roomName !== lastRoom) {
+              scheduleRows.push([{
+                content: roomName.toUpperCase(),
+                colSpan: NUM_COLS,
+                styles: { fillColor: [80, 80, 80], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fs(7), halign: 'left', cellPadding: { left: fs(4), top: fs(1), bottom: fs(1), right: fs(2) } },
+              }])
+              lastRoom = roomName
+            }
+
+            scheduleRows.push([{
+              content: `  ${rack.name || 'Rack'}`,
+              colSpan: NUM_COLS,
+              styles: { fillColor: [230, 230, 230], textColor: [40, 40, 40], fontStyle: 'bold', fontSize: fs(7), halign: 'left', cellPadding: { left: fs(6), top: fs(1), bottom: fs(1), right: fs(2) } },
+            }])
+
+            let rackSeq = 0
+            items.forEach(item => {
+              rackSeq++
+              scheduleRows.push([
+                rackSeq,
+                item.label || '—',
+                item.part_number || item.model || '—',
+                item.description || item.label || '—',
+                item.manufacturer || '—',
+                item.quantity || 1,
+                '—',
+                `${roomName} / ${rack.name || 'Rack'}`,
+                '—',
+                '—',
+              ])
+            })
+          })
+        }
 
         autoTable(pdf, {
           ...schedTableStyle,
