@@ -754,13 +754,34 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
   useEffect(() => { formRef.current = form }, [form])
   useEffect(() => { itemIdRef.current = item.id }, [item.id])
 
-  // Flush pending debounce save when panel closes
+  // Flush pending debounce save when panel closes (call supabase directly to avoid stale prop)
   useEffect(() => {
     return () => {
       if (!saveTimer.current) return
       clearTimeout(saveTimer.current)
       saveTimer.current = null
-      onUpdate(itemIdRef.current, buildPatch(formRef.current))
+      const f = formRef.current
+      const id = itemIdRef.current
+      if (!id) return
+      supabase.from('rack_items').update({
+        label:             f.label             || null,
+        description:       f.description       || null,
+        category:          f.category          || null,
+        manufacturer:      f.manufacturer      || null,
+        part_number:       f.part_number       || null,
+        model:             f.part_number       || null,
+        quantity:          parseInt(f.quantity) || 1,
+        u_size:            parseInt(f.u_size)   || 1,
+        watts_draw:        f.watts_draw ? parseFloat(f.watts_draw) : null,
+        power_source_id:   f.power_source_id   || null,
+        notes:             f.notes             || null,
+        serial_number:     f.serial_number     || null,
+        ip_address:        f.ip_address        || null,
+        mac_address:       f.mac_address       || null,
+        switch_name:       f.switch_name       || null,
+        switch_port:       f.switch_port       || null,
+        patch_panel_label: f.patch_panel_label || null,
+      }).eq('id', id).then(({ error }) => { if (error) console.error('Flush save failed:', error) })
     }
   }, [])
 
