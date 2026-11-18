@@ -5,6 +5,13 @@ import ComponentsSection from './ComponentsSection'
 // Categories that act as power sources (provide PoE / power to other devices)
 const POE_SOURCE_CATEGORIES = ['Network', 'Network Switch', 'Switch', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack', 'Power Supply']
 
+// Categories that don't typically require a cable run (passive/enclosure hardware)
+const NO_CABLE_CATEGORIES = [
+  'Cabinet', 'Rack', 'Enclosure', 'Patch Panel', 'Keystone', 'Backbox',
+  'Access Control Enclosure', 'Power Supply', 'UPS', 'Battery',
+  'Surge Protector', 'Transformer', 'Wall Plate', 'Face Plate',
+]
+
 const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera']
 
 const SENSOR_WIDTHS = {
@@ -91,7 +98,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     runs_to_sheet_id:       p.runs_to_sheet_id       || '',
     runs_to_label:          p.runs_to_label          || '',
     rise_height:            p.rise_height            || '',
-    rise_cable_type:        p.rise_cable_type        || 'Cat6',
+    rise_cable_type:        p.rise_cable_type        || (NO_CABLE_CATEGORIES.includes(product.category) ? 'None' : 'Cat6'),
     fov_angle:              p.fov_angle              || null,
     fov_range:              p.fov_range              || null,
     fov_opacity:            p.fov_opacity            ?? 50,
@@ -438,7 +445,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                   <select value={form.rise_cable_type}
                     onChange={e => update('rise_cable_type', e.target.value)}
                     className={inputClass}>
-                    {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', '18/2', '22/4', 'Composite', 'Power'].map(t => (
+                    {['None', 'Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', '18/2', '22/4', 'Composite', 'Power'].map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>

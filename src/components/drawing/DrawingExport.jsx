@@ -544,7 +544,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     groupSeq++
     const comps = (compByPlacement[p.id] || []).join(', ') || '—'
     const runTypes = [...(placementCableTypes[p.id] || [])]
-    const cableTypes = [...new Set([...(p.rise_cable_type ? [p.rise_cable_type] : []), ...runTypes])]
+    const cableTypes = [...new Set([...(p.rise_cable_type && p.rise_cable_type !== 'None' ? [p.rise_cable_type] : []), ...runTypes])]
     const cable = cableTypes.length ? cableTypes.join(', ') : '—'
     scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), sht?.name||'—', p.runs_to_label||'—', cable, comps])
   })
@@ -2201,7 +2201,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           const sht   = sheets.find(s => s.id === p.drawing_sheet_id)
           const comps = (compByPlacement[p.id] || []).join(', ') || '—'
           const runTypes = [...(placementCableTypes[p.id] || [])]
-          const cableTypes = [...new Set([...(p.rise_cable_type ? [p.rise_cable_type] : []), ...runTypes])]
+          const cableTypes = [...new Set([...(p.rise_cable_type && p.rise_cable_type !== 'None' ? [p.rise_cable_type] : []), ...runTypes])]
           const cable = cableTypes.length ? cableTypes.join(', ') : '—'
           scheduleRows.push([
             groupSeq,
