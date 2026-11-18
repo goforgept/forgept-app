@@ -163,7 +163,7 @@ const ROOM_MARKER_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
 const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
   const sheetRooms = (rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_MARKER_TYPES[r.room_type])
   if (!sheetRooms.length) return
-  const W = Math.max(imgW * 0.14, 20), H = 6.5, BADGE = W * 0.27
+  const W = 22, H = 5, BADGE = 6.5
   for (const room of sheetRooms) {
     const px = imgX + room.x * imgW, py = imgY + room.y * imgH
     const hex = ROOM_MARKER_TYPES[room.room_type]
@@ -178,13 +178,13 @@ const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
     pdf.saveGraphicsState(); pdf.setGState(pdf.GState({ opacity: 0.2 }))
     pdf.setFillColor(cr, cg, cb); pdf.roundedRect(px, py, BADGE, H, 1.2, 1.2, 'F'); pdf.restoreGraphicsState()
     // badge text
-    pdf.setTextColor(cr, cg, cb); pdf.setFontSize(5); pdf.setFont('helvetica', 'bold')
-    pdf.text(ROOM_MARKER_ABBREV[room.room_type], px + BADGE / 2, py + H / 2 + 0.9, { align: 'center' })
+    pdf.setTextColor(cr, cg, cb); pdf.setFontSize(4); pdf.setFont('helvetica', 'bold')
+    pdf.text(ROOM_MARKER_ABBREV[room.room_type], px + BADGE / 2, py + H / 2 + 0.7, { align: 'center' })
     // room name
-    pdf.setTextColor(255, 255, 255); pdf.setFontSize(5.5); pdf.setFont('helvetica', 'bold')
-    const nameX = px + BADGE + 2, maxW = W - BADGE - 3
+    pdf.setTextColor(255, 255, 255); pdf.setFontSize(4.5); pdf.setFont('helvetica', 'bold')
+    const nameX = px + BADGE + 1.5, maxW = W - BADGE - 2.5
     const name = pdf.splitTextToSize(room.name || '', maxW)[0] || ''
-    pdf.text(name, nameX, py + H / 2 + 0.9)
+    pdf.text(name, nameX, py + H / 2 + 0.7)
   }
 }
 
