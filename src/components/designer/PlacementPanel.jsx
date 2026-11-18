@@ -161,9 +161,53 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   const [bulkSelected,      setBulkSelected]      = useState(new Set())
   const [includeComponents, setIncludeComponents] = useState(true)
   const [sourceComponents,  setSourceComponents]  = useState([])
-  const saveTimer = useRef(null)
-  const formRef   = useRef(form)
-  useEffect(() => { formRef.current = form }, [form])
+  const saveTimer    = useRef(null)
+  const formRef      = useRef(form)
+  const placementRef = useRef(placement)
+  useEffect(() => { formRef.current = form },            [form])
+  useEffect(() => { placementRef.current = placement },  [placement])
+
+  // Flush any pending debounced save when the panel closes
+  useEffect(() => {
+    return () => {
+      if (!saveTimer.current) return
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+      const f = formRef.current
+      const id = placementRef.current?.id
+      if (!id) return
+      supabase.from('drawing_placements').update({
+        device_address:        f.device_address        || null,
+        part_number_override:  f.part_number_override  || null,
+        manufacturer_override: f.manufacturer_override || null,
+        description_override:  f.description_override  || null,
+        notes:                 f.notes                 || null,
+        quantity:              parseInt(f.quantity)    || 1,
+        symbol_size:           parseInt(f.symbol_size) || 32,
+        rotation:              parseInt(f.rotation)    || 0,
+        marker_color:          f.marker_color          || '#C8622A',
+        runs_to_sheet_id:      f.runs_to_sheet_id      || null,
+        runs_to_label:         f.runs_to_label         || null,
+        rise_height:           f.rise_height ? parseFloat(f.rise_height) : null,
+        rise_cable_type:       f.rise_cable_type       || null,
+        fov_angle:             f.fov_angle  ? parseInt(f.fov_angle)  : null,
+        fov_range:             f.fov_range  ? parseInt(f.fov_range)  : null,
+        fov_opacity:           f.fov_opacity != null ? parseInt(f.fov_opacity) : 50,
+        serial_number:         f.serial_number         || null,
+        ip_address:            f.ip_address            || null,
+        mac_address:           f.mac_address           || null,
+        switch_name:           f.switch_name           || null,
+        switch_port:           f.switch_port           || null,
+        patch_panel_label:     f.patch_panel_label     || null,
+        labor_overrides: Object.keys(f.labor_overrides || {}).length > 0 ? f.labor_overrides : null,
+        switch_placement_id:   f.switch_placement_id   || null,
+        watts_override:        f.watts_override ? parseFloat(f.watts_override) : null,
+        site_condition:        f.site_condition        || null,
+      }).eq('id', id)
+        // fire-and-forget — component is already unmounting
+        .then(({ error }) => { if (error) console.error('Flush save failed:', error) })
+    }
+  }, [])
 
   const [activeTab, setActiveTab] = useState('properties') // 'properties' | 'dori'
 
