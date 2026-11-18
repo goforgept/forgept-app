@@ -159,32 +159,23 @@ const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = []
 const ROOM_MARKER_TYPES = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }
 const ROOM_MARKER_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE' }
 
-// Draws IDF/MDF/HE room markers onto a PDF page
+// Draws IDF/MDF/HE room markers onto a PDF page as compact text labels
 const drawRoomMarkersOnPDF = (pdf, sheet, rooms, imgX, imgY, imgW, imgH) => {
   const sheetRooms = (rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null && ROOM_MARKER_TYPES[r.room_type])
   if (!sheetRooms.length) return
-  const W = 22, H = 5, BADGE = 6.5
   for (const room of sheetRooms) {
     const px = imgX + room.x * imgW, py = imgY + room.y * imgH
     const hex = ROOM_MARKER_TYPES[room.room_type]
     const cr = parseInt(hex.slice(1,3),16), cg = parseInt(hex.slice(3,5),16), cb = parseInt(hex.slice(5,7),16)
-    // shadow
-    pdf.setFillColor(0,0,0); pdf.saveGraphicsState(); pdf.setGState(pdf.GState({ opacity: 0.25 }))
-    pdf.roundedRect(px + 0.5, py + 0.5, W, H, 1.2, 1.2, 'F'); pdf.restoreGraphicsState()
-    // main body
-    pdf.setFillColor(13, 25, 39); pdf.setDrawColor(cr, cg, cb); pdf.setLineWidth(0.5)
-    pdf.roundedRect(px, py, W, H, 1.2, 1.2, 'FD')
-    // badge fill
-    pdf.saveGraphicsState(); pdf.setGState(pdf.GState({ opacity: 0.2 }))
-    pdf.setFillColor(cr, cg, cb); pdf.roundedRect(px, py, BADGE, H, 1.2, 1.2, 'F'); pdf.restoreGraphicsState()
-    // badge text
-    pdf.setTextColor(cr, cg, cb); pdf.setFontSize(4); pdf.setFont('helvetica', 'bold')
-    pdf.text(ROOM_MARKER_ABBREV[room.room_type], px + BADGE / 2, py + H / 2 + 0.7, { align: 'center' })
-    // room name
-    pdf.setTextColor(255, 255, 255); pdf.setFontSize(4.5); pdf.setFont('helvetica', 'bold')
-    const nameX = px + BADGE + 1.5, maxW = W - BADGE - 2.5
-    const name = pdf.splitTextToSize(room.name || '', maxW)[0] || ''
-    pdf.text(name, nameX, py + H / 2 + 0.7)
+    const abbr = ROOM_MARKER_ABBREV[room.room_type]
+    const label = room.name ? `${abbr}: ${room.name}` : abbr
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'bold')
+    const tw = pdf.getTextWidth(label) + 2.5
+    // small pill background
+    pdf.setFillColor(cr, cg, cb)
+    pdf.roundedRect(px - 1.2, py - 3.5, tw, 4.5, 0.8, 0.8, 'F')
+    pdf.setTextColor(255, 255, 255)
+    pdf.text(label, px, py, { baseline: 'bottom' })
   }
 }
 
@@ -323,7 +314,7 @@ const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
 }
 
 // Exported so ProposalDetail can call it for the bundle download
-export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways = [], orgProfile, proposal, exportFOV = true, exportCables = true, exportPathways = true, rackItemsData = [], rackList = [], rooms = [] }) {
+export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways = [], orgProfile, proposal, exportFOV = true, exportCables = true, exportPathways = true, rackItemsData = [], rackList = [], rooms = [], rackItemComponents = [] }) {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
@@ -430,6 +421,31 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
   }
 
+  // Room type legend entries (IDF/MDF/HE)
+  const usedRoomTypes = [...new Set(rooms.map(r => r.room_type).filter(t => ROOM_MARKER_TYPES[t]))]
+  if (usedRoomTypes.length > 0) {
+    if (col > 0) { lx = margin; ly += 16; col = 0 }
+    ly += 4
+    pdf.setDrawColor(200,210,220); pdf.setLineWidth(0.2); pdf.line(margin, ly, pageW-margin, ly)
+    ly += 6
+    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(9); pdf.setFont('helvetica','bold')
+    pdf.text('TELECOM ROOMS', margin, ly)
+    ly += 8; lx = margin; col = 0
+    for (const rType of usedRoomTypes) {
+      const hex = ROOM_MARKER_TYPES[rType]
+      const [rr, rg, rb] = hexToRgbArr(hex)
+      pdf.setFillColor(rr, rg, rb); pdf.circle(lx+3.5, ly+3, 3.5, 'F')
+      pdf.setTextColor(255,255,255); pdf.setFontSize(5.5); pdf.setFont('helvetica','bold')
+      pdf.text(ROOM_MARKER_ABBREV[rType], lx+3.5, ly+4.5, { align: 'center' })
+      pdf.setTextColor(30,30,30); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
+      pdf.text(ROOM_MARKER_ABBREV[rType] === 'HE' ? 'Head End' : ROOM_MARKER_ABBREV[rType], lx+11, ly+4)
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(90,100,110)
+      pdf.text(`Count: ${rooms.filter(r => r.room_type === rType).length}`, lx+11, ly+9)
+      col++
+      if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
+    }
+  }
+
   // Cable & pathway type legend
   const usedCableTypes = [...new Set(cableRuns.map(r => r.cable_type).filter(Boolean))]
   const usedPathwayTypes = [...new Set(pathways.map(pw => pw.pathway_type).filter(Boolean))]
@@ -502,30 +518,46 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     return (a.device_address || '').localeCompare(b.device_address || '')
   })
 
+  // Build cable type lookup from run points
+  const placementCableTypes = {}
+  const addCT = (pid, type) => { if (!pid || !type) return; if (!placementCableTypes[pid]) placementCableTypes[pid] = new Set(); placementCableTypes[pid].add(type) }
+  cableRuns.forEach(r => {
+    if (!r.cable_type) return
+    addCT(r.from_placement_id, r.cable_type); addCT(r.to_placement_id, r.cable_type)
+    if (Array.isArray(r.points)) r.points.forEach(pt => addCT(pt?.placement_id, r.cable_type))
+  })
+
+  // Build rack item components lookup
+  const compByRackItem = {}
+  rackItemComponents.forEach(c => {
+    if (!compByRackItem[c.rack_item_id]) compByRackItem[c.rack_item_id] = []
+    const label = c.quantity > 1 ? `${c.name||c.component_type} ×${c.quantity}` : (c.name || c.component_type)
+    if (label && !compByRackItem[c.rack_item_id].includes(label)) compByRackItem[c.rack_item_id].push(label)
+  })
+
   const scheduleRows = []
   let lastCat = null, groupSeq = 0
   schedSorted.forEach(p => {
-    const gp = p.global_products, sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+    const gp = p.global_products, sht = sheets.find(s => s.id === p.drawing_sheet_id)
     const cat = gp?.category || 'Uncategorized'
     if (cat !== lastCat) {
-      scheduleRows.push([{ content: cat.toUpperCase(), colSpan: 10, styles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
+      scheduleRows.push([{ content: cat.toUpperCase(), colSpan: 11, styles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
       lastCat = cat; groupSeq = 0
     }
     groupSeq++
     const comps = (compByPlacement[p.id] || []).join(', ') || '—'
-    scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—', comps])
+    const runTypes = [...(placementCableTypes[p.id] || [])]
+    const cableTypes = [...new Set([...(p.rise_cable_type ? [p.rise_cable_type] : []), ...runTypes])]
+    const cable = cableTypes.length ? cableTypes.join(', ') : '—'
+    scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), cable, sht?.name||'—', p.runs_to_label||'—', comps])
   })
 
   // Rack items grouped by room → rack
   if (rackItemsData && rackItemsData.length > 0) {
-    scheduleRows.push([{ content: 'ROOMS / RACK EQUIPMENT', colSpan: 10, styles: { fillColor: [60,60,60], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
-    const roomMap = {}, rackMap = {}, itemsByRack = {}
+    scheduleRows.push([{ content: 'ROOMS / RACK EQUIPMENT', colSpan: 11, styles: { fillColor: [60,60,60], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
+    const roomMap = {}, itemsByRack = {}
     rooms.forEach(r => { roomMap[r.id] = r })
-    rackList.forEach(r => { rackMap[r.id] = r })
-    rackItemsData.forEach(item => {
-      if (!itemsByRack[item.rack_id]) itemsByRack[item.rack_id] = []
-      itemsByRack[item.rack_id].push(item)
-    })
+    rackItemsData.forEach(item => { if (!itemsByRack[item.rack_id]) itemsByRack[item.rack_id] = []; itemsByRack[item.rack_id].push(item) })
     const sortedRacks = [...rackList].sort((a, b) => {
       const rA = roomMap[a.room_id]?.name || '', rB = roomMap[b.room_id]?.name || ''
       return rA !== rB ? rA.localeCompare(rB) : (a.name||'').localeCompare(b.name||'')
@@ -536,17 +568,18 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
       if (!items || !items.length) return
       const roomName = roomMap[rack.room_id]?.name || 'Unknown Room'
       if (roomName !== lastRoom) {
-        scheduleRows.push([{ content: roomName.toUpperCase(), colSpan: 10, styles: { fillColor: [80,80,80], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 4, top: 1, bottom: 1, right: 2 } } }])
+        scheduleRows.push([{ content: roomName.toUpperCase(), colSpan: 11, styles: { fillColor: [80,80,80], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 4, top: 1, bottom: 1, right: 2 } } }])
         lastRoom = roomName
       }
-      scheduleRows.push([{ content: `  ${rack.name || 'Rack'}`, colSpan: 10, styles: { fillColor: [230,230,230], textColor: [40,40,40], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 6, top: 1, bottom: 1, right: 2 } } }])
+      scheduleRows.push([{ content: `  ${rack.name || 'Rack'}`, colSpan: 11, styles: { fillColor: [230,230,230], textColor: [40,40,40], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 6, top: 1, bottom: 1, right: 2 } } }])
       items.forEach((item, idx) => {
-        scheduleRows.push([idx+1, item.label||'—', item.part_number||item.model||'—', item.description||item.label||'—', item.manufacturer||'—', item.quantity||1, '—', `${roomName} / ${rack.name||'Rack'}`, '—', '—'])
+        const comps = (compByRackItem[item.id] || []).join(', ') || '—'
+        scheduleRows.push([idx+1, item.label||'—', item.part_number||item.model||'—', item.description||item.label||'—', item.manufacturer||'—', item.quantity||1, '—', '—', `${roomName} / ${rack.name||'Rack'}`, '—', comps])
       })
     })
   }
 
-  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Sheet','Runs To','Components']], body: scheduleRows, columnStyles: { 9: { cellWidth: 50 } } })
+  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Cable','Sheet','Runs To','Components']], body: scheduleRows, columnStyles: { 10: { cellWidth: 50 } } })
 
   // Cable schedule — inline below device schedule, same style
   const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
@@ -1516,7 +1549,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const handleShopDrawing = async () => {
     setGenerating(true)
     try {
-      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways, rackItemsData, rackList, rooms })
+      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways, rackItemsData, rackList, rooms, rackItemComponents })
       await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
     } catch (err) {
       console.error('Shop drawing failed:', err)
