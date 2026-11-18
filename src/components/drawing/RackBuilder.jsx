@@ -732,19 +732,6 @@ const ITEM_COMPONENT_TYPES = [
   'UPS Battery', 'PDU', 'Rail Kit', 'Other',
 ]
 
-// Category-aware quick-add suggestions (mirrors ComponentsSection)
-const ITEM_QUICK_COMPONENTS = {
-  'Access Control Enclosure': ['Door Controller', 'Sub-Controller', 'Power Supply', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Network Switch', 'Relay Module', 'Transformer', 'Surge Protector', 'Tamper'],
-  'Access Control':           ['Door Controller', 'Sub-Controller', 'Power Supply', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Network Switch', 'Relay Module', 'Transformer', 'Surge Protector', 'Tamper'],
-  'Controller':               ['Power Supply', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Relay Module', 'Surge Protector'],
-  'FACP':                     ['Battery', 'Annunciator', 'DACT', 'NAC Expander', 'Printer', 'Surge Protector'],
-  'NVR':                      ['Hard Drive / SSD', 'Rail Kit', 'UPS Battery', 'Surge Protector'],
-  'Network':                  ['SFP Module', 'SFP+ Module', 'Power Supply (Hot Swap)', 'Fan Module', 'License Key'],
-  'UPS':                      ['UPS Battery', 'PDU', 'Rail Kit'],
-  'Power Supply':             ['Battery 12V 7Ah', 'Battery 12V 12Ah', 'Surge Protector'],
-  'Gate Intercom':            ['Pedestal', 'Post Mount', 'Power Supply', 'Electric Strike', 'Gate Operator Interface', 'Surge Protector'],
-  'Intercom':                 ['Power Supply', 'Back Box', 'Electric Strike', 'Door Release', 'Surge Protector'],
-}
 
 function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents = [], addItemComponent, deleteItemComponent, onUpdate, onDelete, onClose }) {
   const getInitialForm = (i) => ({
@@ -1144,30 +1131,6 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
           {/* Add component form */}
           {showAddComp && addItemComponent && (
             <div className="space-y-2 rounded-lg p-2.5" style={{ background: '#0a1220', border: '1px solid #1e3048' }}>
-              {/* Quick-add buttons based on device category */}
-              {(() => {
-                const quickTypes = ITEM_QUICK_COMPONENTS[form.category] || ITEM_QUICK_COMPONENTS[item.category] || []
-                const existing = new Set(itemComponents.map(c => c.component_type))
-                const suggestions = quickTypes.filter(t => !existing.has(t))
-                if (!suggestions.length) return null
-                return (
-                  <div>
-                    <label className={lc} style={lcStyle}>Quick Add</label>
-                    <div className="flex flex-wrap gap-1">
-                      {suggestions.map(t => (
-                        <button key={t} type="button"
-                          onClick={async () => {
-                            await addItemComponent(item.id, { component_type: t, name: t, quantity: 1 })
-                          }}
-                          className="px-2 py-0.5 text-[10px] rounded border transition-colors hover:border-[#C8622A] hover:text-[#C8622A]"
-                          style={{ background: '#0d1927', border: '1px solid #1e3048', color: '#8A9AB0' }}>
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })()}
               <div>
                 <label className={lc} style={lcStyle}>Type</label>
                 <select className={ic} style={{ ...icStyle, color: '#fff' }}
