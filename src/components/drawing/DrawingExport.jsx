@@ -510,6 +510,37 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     const comps = (compByPlacement[p.id] || []).join(', ') || '—'
     scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—', comps])
   })
+
+  // Rack items grouped by room → rack
+  if (rackItemsData && rackItemsData.length > 0) {
+    scheduleRows.push([{ content: 'ROOMS / RACK EQUIPMENT', colSpan: 10, styles: { fillColor: [60,60,60], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
+    const roomMap = {}, rackMap = {}, itemsByRack = {}
+    rooms.forEach(r => { roomMap[r.id] = r })
+    rackList.forEach(r => { rackMap[r.id] = r })
+    rackItemsData.forEach(item => {
+      if (!itemsByRack[item.rack_id]) itemsByRack[item.rack_id] = []
+      itemsByRack[item.rack_id].push(item)
+    })
+    const sortedRacks = [...rackList].sort((a, b) => {
+      const rA = roomMap[a.room_id]?.name || '', rB = roomMap[b.room_id]?.name || ''
+      return rA !== rB ? rA.localeCompare(rB) : (a.name||'').localeCompare(b.name||'')
+    })
+    let lastRoom = null
+    sortedRacks.forEach(rack => {
+      const items = itemsByRack[rack.id]
+      if (!items || !items.length) return
+      const roomName = roomMap[rack.room_id]?.name || 'Unknown Room'
+      if (roomName !== lastRoom) {
+        scheduleRows.push([{ content: roomName.toUpperCase(), colSpan: 10, styles: { fillColor: [80,80,80], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 4, top: 1, bottom: 1, right: 2 } } }])
+        lastRoom = roomName
+      }
+      scheduleRows.push([{ content: `  ${rack.name || 'Rack'}`, colSpan: 10, styles: { fillColor: [230,230,230], textColor: [40,40,40], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 6, top: 1, bottom: 1, right: 2 } } }])
+      items.forEach((item, idx) => {
+        scheduleRows.push([idx+1, item.label||'—', item.part_number||item.model||'—', item.description||item.label||'—', item.manufacturer||'—', item.quantity||1, '—', `${roomName} / ${rack.name||'Rack'}`, '—', '—'])
+      })
+    })
+  }
+
   autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Sheet','Runs To','Components']], body: scheduleRows, columnStyles: { 9: { cellWidth: 50 } } })
 
   // Cable schedule — inline below device schedule, same style
