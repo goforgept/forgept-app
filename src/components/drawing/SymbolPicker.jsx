@@ -3,10 +3,18 @@ import { supabase } from '../../supabase'
 
 // When a user picks one of these categories, show all related ones together
 const RELATED_CATEGORIES = {
-  'Intercom':          ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
-  'Video Door Station':['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
-  'Master Station':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
-  'Video Intercom':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  // Intercom family
+  'Intercom':          ['Intercom', 'Video Door Station', 'Video Intercom', 'Gate Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Video Door Station':['Intercom', 'Video Door Station', 'Video Intercom', 'Gate Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Master Station':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Gate Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Video Intercom':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Gate Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Gate Intercom':     ['Intercom', 'Video Door Station', 'Video Intercom', 'Gate Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  // Speaker / Paging family
+  'Speaker':           ['Speaker', 'Ceiling Speaker', 'Paging Speaker', 'IP Paging Device', 'IP Speaker', 'Subwoofer', 'Pendant Speaker', 'Horn Speaker', 'Surface Mount Speaker'],
+  'Ceiling Speaker':   ['Speaker', 'Ceiling Speaker', 'Paging Speaker', 'IP Paging Device', 'IP Speaker', 'Subwoofer', 'Pendant Speaker', 'Horn Speaker', 'Surface Mount Speaker'],
+  'Paging Speaker':    ['Speaker', 'Ceiling Speaker', 'Paging Speaker', 'IP Paging Device', 'IP Speaker', 'Subwoofer', 'Pendant Speaker', 'Horn Speaker', 'Surface Mount Speaker'],
+  'IP Paging Device':  ['Speaker', 'Ceiling Speaker', 'Paging Speaker', 'IP Paging Device', 'IP Speaker', 'Subwoofer', 'Pendant Speaker', 'Horn Speaker', 'Surface Mount Speaker'],
+  'IP Speaker':        ['Speaker', 'Ceiling Speaker', 'Paging Speaker', 'IP Paging Device', 'IP Speaker', 'Subwoofer', 'Pendant Speaker', 'Horn Speaker', 'Surface Mount Speaker'],
 }
 
 const INDUSTRY_LABELS = {
