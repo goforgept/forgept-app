@@ -758,30 +758,38 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
     setShowAddComp(false)
   }, [item.id])
 
+  const buildPatch = (f) => ({
+    label:             f.label             || null,
+    description:       f.description       || null,
+    category:          f.category          || null,
+    manufacturer:      f.manufacturer      || null,
+    part_number:       f.part_number       || null,
+    model:             f.part_number       || null,
+    quantity:          parseInt(f.quantity) || 1,
+    u_size:            parseInt(f.u_size)   || 1,
+    watts_draw:        f.watts_draw ? parseFloat(f.watts_draw) : null,
+    power_source_id:   f.power_source_id   || null,
+    notes:             f.notes             || null,
+    serial_number:     f.serial_number     || null,
+    ip_address:        f.ip_address        || null,
+    mac_address:       f.mac_address       || null,
+    switch_name:       f.switch_name       || null,
+    switch_port:       f.switch_port       || null,
+    patch_panel_label: f.patch_panel_label || null,
+  })
+
+  const saveNow = async () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    await onUpdate(item.id, buildPatch(formRef.current))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+
   const update = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      const f = formRef.current
-      await onUpdate(item.id, {
-        label:             f.label             || null,
-        description:       f.description       || null,
-        category:          f.category          || null,
-        manufacturer:      f.manufacturer      || null,
-        part_number:       f.part_number       || null,
-        model:             f.part_number       || null,
-        quantity:          parseInt(f.quantity) || 1,
-        u_size:            parseInt(f.u_size)   || 1,
-        watts_draw:        f.watts_draw ? parseFloat(f.watts_draw) : null,
-        power_source_id:   f.power_source_id   || null,
-        notes:             f.notes             || null,
-        serial_number:     f.serial_number     || null,
-        ip_address:        f.ip_address        || null,
-        mac_address:       f.mac_address       || null,
-        switch_name:       f.switch_name       || null,
-        switch_port:       f.switch_port       || null,
-        patch_panel_label: f.patch_panel_label || null,
-      })
+      await onUpdate(item.id, buildPatch(formRef.current))
       setSaved(true)
       setTimeout(() => setSaved(false), 1500)
     }, 600)
@@ -836,13 +844,15 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
               <label className={lc} style={lcStyle}>Part Number</label>
               <input className={ic} style={icStyle}
                 value={form.part_number} placeholder="e.g. C9200-24P-E"
-                onChange={e => update('part_number', e.target.value)} />
+                onChange={e => update('part_number', e.target.value)}
+                onBlur={saveNow} />
             </div>
             <div>
               <label className={lc} style={lcStyle}>Manufacturer</label>
               <input className={ic} style={icStyle}
                 value={form.manufacturer} placeholder="e.g. Cisco, Ubiquiti"
-                onChange={e => update('manufacturer', e.target.value)} />
+                onChange={e => update('manufacturer', e.target.value)}
+                onBlur={saveNow} />
             </div>
             <div>
               <label className={lc} style={lcStyle}>Description</label>

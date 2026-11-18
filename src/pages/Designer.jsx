@@ -308,6 +308,19 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     if (sheet) setActiveSheetId(sheet.id)
   }
 
+  const handleAddSitemapSheet = async () => {
+    const { data: sheet } = await supabase
+      .from('drawing_sheets')
+      .insert({ org_id: orgId, proposal_id: proposalId, name: 'Site Map', storage_path: 'sitemap', map_zoom: 18, sort_order: sheets.length })
+      .select().single()
+    await load()
+    if (sheet) setActiveSheetId(sheet.id)
+  }
+
+  const handleSheetUpdate = (sheetId, updates) => {
+    setSheets(prev => prev.map(s => s.id === sheetId ? { ...s, ...updates } : s))
+  }
+
   const handleNotesSheetAdded = async () => {
     const { data: sheetData } = await supabase
       .from('drawing_sheets').select('*')
@@ -772,6 +785,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
           </svg>
           Blank Canvas
         </button>
+
+        {/* Site Map sheet */}
+        <button onClick={handleAddSitemapSheet}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] transition-colors whitespace-nowrap">
+          🛰 Site Map
+        </button>
       </div>
 
       {/* ── Main content area ── */}
@@ -874,6 +893,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                           await supabase.from('rooms').update({ x, y }).eq('id', id)
                           setRooms(prev => prev.map(r => r.id === id ? { ...r, x, y } : r))
                         }}
+                        onSheetUpdate={handleSheetUpdate}
                       />
                     )}
                   </div>

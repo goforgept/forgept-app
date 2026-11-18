@@ -156,7 +156,7 @@ const getNextLabel = async (category, sheetIds, reserved = []) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onToolSelect, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
+export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onToolSelect, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove, onSheetUpdate }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   // Session-local cache of addresses assigned this session so rapid placements
@@ -326,9 +326,18 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
   useEffect(() => { annotationColorRef.current = annotationColor }, [annotationColor])
   useEffect(() => { sheetIdRef.current = sheet.id }, [sheet.id])
   useEffect(() => { orgIdRef.current   = orgId },    [orgId])
+  // Clear measure mode when switching to another tool
+  useEffect(() => { if (activeTool || selectedSymbol) setMeasureMode(false) }, [activeTool, selectedSymbol])
 
   
   const snapRadius = 20 // pixels — snap to device marker within this distance
+
+  // ── Sitemap / measurement state ────────────────────────────────────────────
+  const [measureMode,   setMeasureMode]   = useState(false)
+  const [measurePoints, setMeasurePoints] = useState([]) // normalized {x,y}, max 2
+  const [sitemapAddr,   setSitemapAddr]   = useState('')
+  const [geocoding,     setGeocoding]     = useState(false)
+  const [mapZoomEdit,   setMapZoomEdit]   = useState(null) // null = not editing
 
   const [showScaleModal,  setShowScaleModal]  = useState(false)
   const [scaleMethod,     setScaleMethod]     = useState('manual')
@@ -377,8 +386,13 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     if (!sheet?.storage_path) return
     if (sheet.storage_path === 'pending') return
     if (sheet.storage_path === 'blank') { setLoading(false); return }
+    if (sheet.storage_path === 'sitemap') {
+      if (!sheet.map_lat || !sheet.map_lng) { setLoading(false); return }
+      loadSitemapImage()
+      return
+    }
     loadFloorPlan()
-  }, [sheet?.storage_path, sheet?._fileId])
+  }, [sheet?.storage_path, sheet?._fileId, sheet?.map_lat, sheet?.map_lng, sheet?.map_zoom])
 
   const [loadStep, setLoadStep] = useState('')
 
@@ -564,6 +578,49 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     img.onerror = reject
     img.src = url
   })
+
+  const loadSitemapImage = async () => {
+    setLoading(true)
+    setError(null)
+    const token = import.meta.env.VITE_MAPBOX_TOKEN
+    if (!token) { setError('Mapbox token not configured. Add VITE_MAPBOX_TOKEN to .env.local.'); setLoading(false); return }
+    const zoom = sheet.map_zoom || 18
+    const size = 1280
+    const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/${size}x${size}@1x?access_token=${token}`
+    try {
+      await loadImageFromUrl(url)
+    } catch {
+      setError('Failed to load satellite image. Check your Mapbox token and internet connection.')
+      setLoading(false)
+    }
+  }
+
+  const geocodeAddress = async () => {
+    if (!sitemapAddr.trim()) return
+    setGeocoding(true)
+    try {
+      const token = import.meta.env.VITE_MAPBOX_TOKEN
+      if (!token) { alert('Mapbox token not configured. Add VITE_MAPBOX_TOKEN to .env.local.'); return }
+      const query = encodeURIComponent(sitemapAddr.trim())
+      const res   = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?country=US&limit=1&access_token=${token}`)
+      const data  = await res.json()
+      const feature = data.features?.[0]
+      if (!feature) { alert('Address not found. Try including city and state.'); return }
+      const [lng, lat] = feature.center
+      const zoom = sheet.map_zoom || 18
+      await supabase.from('drawing_sheets').update({ map_lat: lat, map_lng: lng, map_zoom: zoom, map_address: feature.place_name }).eq('id', sheet.id)
+      onSheetUpdate?.(sheet.id, { map_lat: lat, map_lng: lng, map_zoom: zoom, map_address: feature.place_name })
+    } catch {
+      alert('Geocoding failed. Check your Mapbox token.')
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
+  const updateMapZoom = async (zoom) => {
+    await supabase.from('drawing_sheets').update({ map_zoom: zoom }).eq('id', sheet.id)
+    onSheetUpdate?.(sheet.id, { map_zoom: zoom })
+  }
 
   const fitToStage = useCallback((imgW, imgH) => {
     if (!containerRef.current) return
@@ -753,6 +810,14 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
             fov_angle:           copiedPlacement.fov_angle,
             fov_range:           copiedPlacement.fov_range,
             site_condition:      copiedPlacement.site_condition,
+            runs_to_sheet_id:    copiedPlacement.runs_to_sheet_id,
+            runs_to_label:       copiedPlacement.runs_to_label,
+            rise_height:         copiedPlacement.rise_height,
+            rise_cable_type:     copiedPlacement.rise_cable_type,
+            switch_name:         copiedPlacement.switch_name,
+            switch_placement_id: copiedPlacement.switch_placement_id,
+            watts_override:      copiedPlacement.watts_override,
+            labor_overrides:     copiedPlacement.labor_overrides,
             source:              'manual',
           })
           .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories, description)')
@@ -1129,7 +1194,14 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
   }, [clientToNorm])
 
   // ── Canvas dimensions ──────────────────────────────────────────────────────
-  const isBlank = sheet.storage_path === 'blank'
+  const isBlank   = sheet.storage_path === 'blank'
+  const isSitemap = sheet.storage_path === 'sitemap'
+  // meters per image-pixel — derived from Mapbox Web Mercator formula
+  const metersPerPixel = isSitemap && sheet.map_lat && sheet.map_zoom
+    ? (156543.034 * Math.cos(sheet.map_lat * Math.PI / 180)) / Math.pow(2, sheet.map_zoom)
+    : null
+  const feetPerPixel = metersPerPixel ? metersPerPixel * 3.28084 : null
+
   const canvasW = isBlank ? Math.max(stageSize.w, 1200) : imageSize.w
   const canvasH = isBlank ? Math.max(stageSize.h, 900) : imageSize.h
   canvasWRef.current   = canvasW
@@ -1240,6 +1312,16 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
         onCableSelect?.(null)
       }
     }
+
+    // Measure mode — capture clicks before background-only check
+    if (measureMode && onBg) {
+      const pointer = stageRef.current.getPointerPosition()
+      const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0), 1)
+      const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0), 1)
+      setMeasurePoints(prev => prev.length >= 2 ? [{ x: nx, y: ny }] : [...prev, { x: nx, y: ny }])
+      return
+    }
+
     if (!onBg) return
 
     // Handle two-point calibration picking
@@ -1786,12 +1868,63 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
             </svg>
             {calibratedScale || 'Set Scale'}
           </button>
-          {bgImage && !isBlank && (
+          {bgImage && !isBlank && !isSitemap && (
             <button onClick={rotateBg} title="Rotate floor plan 90°"
               className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded-lg hover:bg-[#0F1C2E] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
+            </button>
+          )}
+
+          {/* Sitemap zoom controls */}
+          {isSitemap && sheet.map_lat && (
+            <div className="flex items-center gap-1">
+              {mapZoomEdit !== null ? (
+                <>
+                  <input
+                    type="range" min="15" max="21" step="1"
+                    value={mapZoomEdit}
+                    onChange={e => setMapZoomEdit(Number(e.target.value))}
+                    className="w-20 accent-[#C8622A]"
+                  />
+                  <span className="text-[#8A9AB0] text-xs w-4 tabular-nums">{mapZoomEdit}</span>
+                  <button onClick={async () => { await updateMapZoom(mapZoomEdit); setMapZoomEdit(null) }}
+                    className="text-xs text-green-400 hover:text-green-300 px-1.5 py-0.5 rounded border border-green-700/50 bg-green-900/20">
+                    Apply
+                  </button>
+                  <button onClick={() => setMapZoomEdit(null)} className="text-xs text-[#8A9AB0] hover:text-white">✕</button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setMapZoomEdit(sheet.map_zoom || 18)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] text-xs transition-colors"
+                  title="Adjust map zoom level"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                  </svg>
+                  Zoom {sheet.map_zoom || 18}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Measure tool — only shown for sitemap sheets with scale */}
+          {isSitemap && feetPerPixel && (
+            <button
+              onClick={() => {
+                setMeasureMode(m => !m)
+                setMeasurePoints([])
+              }}
+              title="Measure distance"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                measureMode
+                  ? 'border-green-500/60 bg-green-900/20 text-green-400'
+                  : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'
+              }`}
+            >
+              📏 Measure
             </button>
           )}
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
@@ -1811,7 +1944,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
 
       {/* Canvas */}
       {/* Scale-not-set banner */}
-      {!scaleRatio && (
+      {!scaleRatio && !isSitemap && (
         <div className="flex items-center justify-between px-3 py-1.5 bg-yellow-900/30 border-b border-yellow-700/50 flex-shrink-0">
           <span className="text-yellow-400 text-xs">
             No scale set — FOV distances are estimates. Calibrate for accurate measurements.
@@ -1825,8 +1958,53 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
-        style={{ cursor: pickingPoint || annotationTool ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
+      {/* Sitemap address setup overlay */}
+      {isSitemap && !sheet.map_lat && !loading && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 bg-[#060f1c]">
+          <div className="w-16 h-16 rounded-2xl bg-[#1a2d45] flex items-center justify-center text-3xl">🛰</div>
+          <div className="text-center">
+            <p className="text-white font-semibold text-base">Set site address</p>
+            <p className="text-[#8A9AB0] text-sm mt-1 max-w-xs">Enter the address or location to load a satellite view. Devices can then be placed on the map.</p>
+          </div>
+          <div className="w-full max-w-sm space-y-3">
+            <input
+              type="text"
+              placeholder="123 Main St, City, State"
+              value={sitemapAddr}
+              onChange={e => setSitemapAddr(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') geocodeAddress() }}
+              className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d70]"
+            />
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Zoom level (15=neighborhood → 20=parcel)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range" min="15" max="20" step="1"
+                    value={sheet.map_zoom || 18}
+                    onChange={async e => {
+                      await supabase.from('drawing_sheets').update({ map_zoom: Number(e.target.value) }).eq('id', sheet.id)
+                      onSheetUpdate?.(sheet.id, { map_zoom: Number(e.target.value) })
+                    }}
+                    className="flex-1 accent-[#C8622A]"
+                  />
+                  <span className="text-[#8A9AB0] text-xs w-4 tabular-nums">{sheet.map_zoom || 18}</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={geocodeAddress}
+              disabled={geocoding || !sitemapAddr.trim()}
+              className="w-full py-2.5 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {geocoding ? 'Loading…' : 'Load Satellite Map'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div ref={containerRef} className={`${isSitemap && !sheet.map_lat ? 'hidden' : 'flex-1'} overflow-hidden bg-[#060f1c] relative`}
+        style={{ cursor: measureMode ? 'crosshair' : pickingPoint || annotationTool ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
         onContextMenu={(e) => e.preventDefault()}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
         onDrop={async (e) => {
@@ -1901,7 +2079,62 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="text-center">
               <p className="text-red-400 text-sm mb-2">{error}</p>
-              <button onClick={loadFloorPlan} className="text-xs text-[#C8622A] underline">Try again</button>
+              <button onClick={isSitemap ? loadSitemapImage : loadFloorPlan} className="text-xs text-[#C8622A] underline">Try again</button>
+            </div>
+          </div>
+        )}
+
+        {/* Scale bar — sitemap only */}
+        {!loading && isSitemap && feetPerPixel && bgImage && (() => {
+          const niceIncrements = [25, 50, 100, 150, 200, 300, 500]
+          const rawFt   = 100 * feetPerPixel / scale
+          const inc     = niceIncrements.find(n => n >= rawFt) || 500
+          const barPx   = Math.round(inc * scale / feetPerPixel)
+          const meters  = Math.round(inc / 3.28084)
+          return (
+            <div className="absolute bottom-4 left-4 z-10 pointer-events-none select-none">
+              <div className="flex flex-col items-start gap-0.5">
+                <div className="flex items-center gap-0">
+                  <div className="border-l border-b border-t border-white/60 h-2" style={{ width: barPx }} />
+                  <div className="border-r border-b border-t border-white/60 h-2 w-0" />
+                </div>
+                <span className="text-white/80 text-[10px] font-medium drop-shadow" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+                  {inc} ft ({meters} m)
+                </span>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Measurement result badge */}
+        {measureMode && measurePoints.length === 2 && feetPerPixel && (() => {
+          const dx = (measurePoints[1].x - measurePoints[0].x) * canvasW
+          const dy = (measurePoints[1].y - measurePoints[0].y) * canvasH
+          const distPx  = Math.sqrt(dx * dx + dy * dy)
+          const distFt  = Math.round(distPx * feetPerPixel)
+          const distM   = Math.round(distPx * metersPerPixel)
+          return (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="bg-[#0F1C2E]/90 border border-green-500/40 rounded-xl px-4 py-2 flex items-center gap-2">
+                <span className="text-green-400 text-sm">📏</span>
+                <span className="text-white font-semibold text-sm tabular-nums">{distFt.toLocaleString()} ft</span>
+                <span className="text-[#8A9AB0] text-xs">({distM.toLocaleString()} m)</span>
+                <button
+                  className="pointer-events-auto ml-1 text-[#8A9AB0] hover:text-white text-xs"
+                  onClick={() => setMeasurePoints([])}
+                >✕</button>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Measure mode instruction */}
+        {measureMode && measurePoints.length < 2 && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+            <div className="bg-[#0F1C2E]/90 border border-green-500/40 rounded-xl px-4 py-2">
+              <span className="text-green-400 text-xs">
+                {measurePoints.length === 0 ? 'Click to set start point' : 'Click to set end point'}
+              </span>
             </div>
           </div>
         )}
@@ -1939,6 +2172,30 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
                   fill="#1a1a2e" stroke="#2a3d55" strokeWidth={1} listening={true}/>
               )}
             </Layer>
+
+            {/* Measurement line layer */}
+            {measureMode && measurePoints.length > 0 && (
+              <Layer listening={false}>
+                {measurePoints.map((pt, i) => (
+                  <Circle key={i}
+                    x={position.x + pt.x * canvasW * scale}
+                    y={position.y + pt.y * canvasH * scale}
+                    radius={5} fill="#34d399" stroke="#fff" strokeWidth={1.5}
+                  />
+                ))}
+                {measurePoints.length === 2 && (
+                  <Line
+                    points={[
+                      position.x + measurePoints[0].x * canvasW * scale,
+                      position.y + measurePoints[0].y * canvasH * scale,
+                      position.x + measurePoints[1].x * canvasW * scale,
+                      position.y + measurePoints[1].y * canvasH * scale,
+                    ]}
+                    stroke="#34d399" strokeWidth={1.5} dash={[6, 4]}
+                  />
+                )}
+              </Layer>
+            )}
 
            {/* FOV overlay layer — interactive handles on selected camera */}
             {showFOV && (
