@@ -10,17 +10,24 @@ const DEFAULT_COMPONENTS = {
   'Multi-Lens Camera':   ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
   'Fisheye Camera':      ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
   'LPR Camera':          ['Mount', 'IR Illuminator', 'Junction Box', 'Surge Protector'],
+  'Video':               ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'Camera':              ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
 
   // Security — Access Control
-  'Access Control Enclosure': ['Door Controller', 'Power Supply', 'Battery Backup', 'Fiber Interface', 'Network Switch', 'Surge Protector', 'Tamper'],
-  'Access Reader':       ['Back Box', 'Surge Protector', 'REX', 'Door Contact', 'Strike', 'Lock', 'Power Supply'],
-  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Push to Exit'],
-  'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup', 'Surge Protector'],
+  'Access Control Enclosure': ['Door Controller', 'Sub-Controller', 'Power Supply', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Battery Backup', 'Network Switch', 'Fiber Interface', 'Relay Module', 'Transformer', 'Surge Protector', 'Tamper'],
+  'Access Control':      ['Door Controller', 'Sub-Controller', 'Power Supply', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Battery Backup', 'Network Switch', 'Relay Module', 'Transformer', 'Surge Protector', 'Tamper'],
+  'Access Reader':       ['Back Box', 'Surge Protector', 'REX', 'Door Contact', 'Electric Strike', 'Mag Lock', 'Power Supply'],
+  'Reader':              ['Back Box', 'Surge Protector', 'REX', 'Door Contact', 'Electric Strike', 'Mag Lock', 'Power Supply'],
+  'Access Control Door': ['Lock Hardware', 'Electric Strike', 'Mag Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Push to Exit', 'Door Coordinator'],
+  'Door':                ['Lock Hardware', 'Electric Strike', 'Mag Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Push to Exit'],
+  'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup', 'Battery 12V 7Ah', 'Battery 12V 12Ah', 'Surge Protector', 'Relay Module'],
   'Motion Sensor':       ['Back Box', 'Surge Protector'],
-  'Intercom':            ['Power Supply', 'Back Box', 'Strike', 'Door Release', 'Surge Protector'],
+  'Intercom':            ['Power Supply', 'Back Box', 'Electric Strike', 'Door Release', 'Surge Protector'],
   'Sensor':              ['Back Box', 'Power Supply', 'Surge Protector'],
   'Wireless Lock':       ['Battery Pack', 'Wireless Gateway', 'Credential', 'Door Coordinator'],
   'Guard Tour':          ['Charging Cradle', 'Software License'],
+  'REX':                 ['Back Box', 'Power Supply'],
+  'Request to Exit':     ['Back Box', 'Power Supply'],
 
   // Security — Fire Alarm
   'Smoke Detector':      ['Base'],
@@ -179,7 +186,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
     setLibrarySearch('')
   }
 
-  const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
+  const defaultTypes = DEFAULT_COMPONENTS[product?.item_name] || DEFAULT_COMPONENTS[product?.name] || DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
   const inputClass   = "w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand placeholder-[#4a5a6a]"
 
   const handleSelectOption = async (group, choice) => {

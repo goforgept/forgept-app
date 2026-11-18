@@ -750,7 +750,19 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
   const [addingComp,   setAddingComp]   = useState(false)
   const saveTimer = useRef(null)
   const formRef   = useRef(form)
+  const itemIdRef = useRef(item.id)
   useEffect(() => { formRef.current = form }, [form])
+  useEffect(() => { itemIdRef.current = item.id }, [item.id])
+
+  // Flush pending debounce save when panel closes
+  useEffect(() => {
+    return () => {
+      if (!saveTimer.current) return
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+      onUpdate(itemIdRef.current, buildPatch(formRef.current))
+    }
+  }, [])
 
   useEffect(() => {
     setForm(getInitialForm(item))
@@ -858,7 +870,8 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents 
               <label className={lc} style={lcStyle}>Description</label>
               <input className={ic} style={icStyle}
                 value={form.description} placeholder="e.g. 24-port PoE+ Managed Switch"
-                onChange={e => update('description', e.target.value)} />
+                onChange={e => update('description', e.target.value)}
+                onBlur={saveNow} />
             </div>
             <div>
               <label className={lc} style={lcStyle}>Category</label>
