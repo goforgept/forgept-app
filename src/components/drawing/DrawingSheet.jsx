@@ -110,6 +110,7 @@ const LABEL_PREFIXES = {
   'License Plate Reader':'LPR',
   'Elevator Reader':     'ELV',
   'Request to Exit':     'REX',
+  'Door Release':        'DRL',
   'Credential Reader':   'RDR',
   // IT / Networking
   'Router':                'RTR',

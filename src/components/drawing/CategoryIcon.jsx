@@ -32,6 +32,8 @@ export default function CategoryIcon({ category, size = 40 }) {
       return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="3" strokeWidth="1.5"/><circle cx="20" cy="14" r="4" strokeWidth="1.5"/><path d="M14 24 L26 24 M14 28 L22 28" strokeWidth="1.2" strokeLinecap="round"/></svg>
     case 'Wireless Lock':
       return <svg {...props}><rect x="10" y="18" width="20" height="16" rx="2" strokeWidth="1.5"/><path d="M14 18 L14 13 Q14 6 20 6 Q26 6 26 13 L26 18" strokeWidth="1.5" fill="none"/><circle cx="20" cy="26" r="2.5" fill="currentColor"/></svg>
+    case 'Door Release':
+      return <svg {...props}><rect x="8" y="6" width="24" height="28" rx="2" strokeWidth="1.5"/><rect x="13" y="16" width="14" height="8" rx="2" strokeWidth="1.5"/><circle cx="27" cy="20" r="2" fill="currentColor"/></svg>
     case 'Door Operator':
       return <svg {...props}><path d="M6 6 L6 32" strokeWidth="1.5" strokeLinecap="round"/><path d="M6 32 A26 26 0 0 0 32 6" strokeDasharray="3 3" strokeWidth="1"/><rect x="28" y="2" width="10" height="8" rx="1" strokeWidth="1.5"/></svg>
     case 'PIR Detector': case 'Motion Sensor':
