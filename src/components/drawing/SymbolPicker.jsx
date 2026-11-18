@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 
+// When a user picks one of these categories, show all related ones together
+const RELATED_CATEGORIES = {
+  'Intercom':          ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Video Door Station':['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Master Station':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+  'Video Intercom':    ['Intercom', 'Video Door Station', 'Video Intercom', 'Master Station', 'Door Station', 'IP Intercom'],
+}
+
 const INDUSTRY_LABELS = {
   all:         'All',
   security:    'Security',
@@ -136,22 +144,25 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   }, [manufacturer, industry, allProducts])
 
   useEffect(() => {
+    const relatedCats = category ? (RELATED_CATEGORIES[category] || [category]) : null
     const filtered = allProducts.filter(p => {
       if (!p.is_active) return false
       if (industry !== 'all' && p.industry !== industry) return false
       if (manufacturer && p.manufacturer !== manufacturer) return false
-      if (category && p.category !== category) return false
+      if (relatedCats && !relatedCats.includes(p.category)) return false
       return true
     })
     setSymbols(filtered)
   }, [category, industry, manufacturer, allProducts])
 
   const filtered = search.trim()
-    ? symbols.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.part_number.toLowerCase().includes(search.toLowerCase()) ||
-        s.model_number?.toLowerCase().includes(search.toLowerCase())
-      )
+    ? symbols.filter(s => {
+        const q = search.toLowerCase()
+        return s.name.toLowerCase().includes(q) ||
+          s.part_number.toLowerCase().includes(q) ||
+          s.model_number?.toLowerCase().includes(q) ||
+          s.category?.toLowerCase().includes(q)
+      })
     : symbols
 
   const handleTabChange = (newTab) => {
@@ -254,7 +265,9 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
               >
                 <option value="">All Categories</option>
                 {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>
+                    {cat}{RELATED_CATEGORIES[cat] ? ' (+related)' : ''}
+                  </option>
                 ))}
               </select>
             </div>
