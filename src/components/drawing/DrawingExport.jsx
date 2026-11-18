@@ -546,6 +546,12 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
 
   drawTitleBlock('Schedules', 3)
 
+  // Pre-fetch all floor plan images in parallel before building PDF pages
+  const sheetImgMap = {}
+  await Promise.all(sheets.map(async s => {
+    sheetImgMap[s.id] = await getFloorPlanImageFromR2(s.id, sheets)
+  }))
+
   // Floor plan sheets
   for (let i = 0; i < sheets.length; i++) {
     const sheet = sheets[i]
@@ -554,8 +560,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
     pdf.text(sheet.name, margin, 7)
     const imgY = 12, imgH = pageH - imgY - titleBlockH - margin - 5, imgW = pageW - margin*2
-    const imgData = await getFloorPlanImageFromR2(sheet.id, sheets)
-    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways, rooms)
+    await drawSheetOnPDFStandalone(pdf, sheet, sheetImgMap[sheet.id], margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways, rooms)
     drawTitleBlock(sheet.name, i+4)
   }
 
@@ -1394,6 +1399,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
 
       // ── One page per sheet ───────────────────────────────────────────────
+      // Pre-fetch all floor plan images in parallel
+      const sheetImgCache = {}
+      await Promise.all(sheets.map(async s => {
+        sheetImgCache[s.id] = await getFloorPlanImage(s.id)
+      }))
+
       for (let i = 0; i < sheets.length; i++) {
         const sheet = sheets[i]
         pdf.addPage()
@@ -1425,8 +1436,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const maxImgW     = pageW - margin * 2
 
         // Draw floor plan maintaining aspect ratio
-        const imgData = await getFloorPlanImage(sheet.id)
-        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, maxImgW, maxImgH, exportFOV)
+        await drawSheetOnPDF(pdf, sheet, sheetImgCache[sheet.id], margin, imgY, maxImgW, maxImgH, exportFOV)
 
         // Title block footer
         const tbY = pageH - titleBlockH
