@@ -434,6 +434,16 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
               </p>
               <div className="space-y-2">
                 <div>
+                  <label className={labelClass}>Cable type</label>
+                  <select value={form.rise_cable_type}
+                    onChange={e => update('rise_cable_type', e.target.value)}
+                    className={inputClass}>
+                    {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', '18/2', '22/4', 'Composite', 'Power'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className={labelClass}>Runs to</label>
                   <input type="text" value={form.runs_to_label}
                     onChange={e => update('runs_to_label', e.target.value)}
@@ -442,17 +452,6 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 </div>
                 {form.runs_to_label && (
                   <>
-
-                    <div>
-                      <label className={labelClass}>Cable type</label>
-                      <select value={form.rise_cable_type}
-                        onChange={e => update('rise_cable_type', e.target.value)}
-                        className={inputClass}>
-                        {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', '18/2', '22/4', 'Composite', 'Power'].map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
                     <div>
                       <label className={labelClass}>Vertical rise <span className="text-[#4a5a6a]">(feet, optional)</span></label>
                       <input type="number" value={form.rise_height}
