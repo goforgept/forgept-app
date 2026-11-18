@@ -375,7 +375,10 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     })
   })
 
-  const usedCategories = [...new Set(placements.map(p => p.global_products?.category).filter(Boolean))].sort()
+  const usedCategories = [...new Set([
+    ...placements.map(p => p.global_products?.category),
+    ...rackItemsData.map(i => i.global_products?.category || i.category),
+  ].filter(Boolean))].sort()
 
   const drawTitleBlock = (sheetName, sheetNum) => {
     pdf.setDrawColor(210,210,210); pdf.setLineWidth(0.3)
@@ -420,7 +423,9 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     pdf.setTextColor(30,30,30); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
     pdf.text(category, lx+11, ly+4)
     pdf.setFont('helvetica','normal'); pdf.setTextColor(90,100,110)
-    pdf.text(`Count: ${placements.filter(p => p.global_products?.category === category).length}`, lx+11, ly+9)
+    const placementCount = placements.filter(p => p.global_products?.category === category).length
+    const rackItemCount  = rackItemsData.filter(i => (i.global_products?.category || i.category) === category).length
+    pdf.text(`Count: ${placementCount + rackItemCount}`, lx+11, ly+9)
     col++
     if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
   }
