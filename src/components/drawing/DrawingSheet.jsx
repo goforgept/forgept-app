@@ -170,6 +170,12 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
   // Session-local cache of addresses assigned this session so rapid placements
   // don't both read the same DB max before either insert lands.
   const sessionAddressesRef = useRef([])
+  // A deleted device frees its label, so the next device can reuse that number.
+  const releaseAddresses = useCallback((ids) => {
+    const idSet = new Set(ids)
+    const freed = new Set(placementsRef.current.filter(p => idSet.has(p.id)).map(p => p.device_address).filter(Boolean))
+    if (freed.size) sessionAddressesRef.current = sessionAddressesRef.current.filter(a => !freed.has(a))
+  }, [])
   const nextLabel = useCallback(async (category, sheetIds) => {
     const addr = await getNextLabel(category, sheetIds, sessionAddressesRef.current)
     if (addr) sessionAddressesRef.current = [...sessionAddressesRef.current, addr]
@@ -245,6 +251,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
    * Real IDs offline: queue a delete op for when connectivity returns.
    */
   const deletePlacement = useCallback(async (id) => {
+    releaseAddresses([id])
     if (id.startsWith('PEND_')) {
       await cancelOp(sheet.proposal_id, id)
     } else if (isOnline) {
@@ -252,7 +259,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     } else {
       await enqueueOp(sheet.proposal_id, { type: 'delete_placement', payload: { id } })
     }
-  }, [isOnline, sheet])
+  }, [isOnline, sheet, releaseAddresses])
 
   useEffect(() => {
     if (stageRef.current) onStageReady?.(stageRef.current)
@@ -1600,6 +1607,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
               <span className="text-blue-400 font-semibold text-xs">{selectedIds.size} selected</span>
               <button onClick={async () => {
                 if (!window.confirm(`Delete ${selectedIds.size} devices?`)) return
+                releaseAddresses([...selectedIds])
                 for (const id of selectedIds) {
                   await supabase.from('drawing_placements').delete().eq('id', id)
                 }
