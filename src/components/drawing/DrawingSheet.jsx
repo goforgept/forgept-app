@@ -594,7 +594,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     if (!token) { setError('Mapbox token not configured. Add VITE_MAPBOX_TOKEN to .env.local.'); setLoading(false); return }
     const zoom = sheet.map_zoom || 18
     const size = 1280
-    const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/${size}x${size}@1x?access_token=${token}`
+    const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/${size}x${size}?access_token=${token}`
     try {
       const res = await fetch(url)
       if (!res.ok) throw new Error(`Mapbox returned ${res.status}`)
