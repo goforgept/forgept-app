@@ -618,7 +618,8 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
       const zoom = sheet.map_zoom || 18
       await supabase.from('drawing_sheets').update({ map_lat: lat, map_lng: lng, map_zoom: zoom, map_address: feature.place_name }).eq('id', sheet.id)
       onSheetUpdate?.(sheet.id, { map_lat: lat, map_lng: lng, map_zoom: zoom, map_address: feature.place_name })
-    } catch {
+    } catch (err) {
+      console.error('Geocoding error:', err)
       alert('Geocoding failed. Check your Mapbox token.')
     } finally {
       setGeocoding(false)
