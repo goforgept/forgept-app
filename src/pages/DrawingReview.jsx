@@ -344,6 +344,12 @@ export default function DrawingReview() {
   const [error,         setError]         = useState(null)
   const [approved,      setApproved]      = useState(false)
   const [rooms,         setRooms]         = useState([])
+  const [allRooms,      setAllRooms]      = useState([])
+  const [rackList,      setRackList]      = useState([])
+  const [rackItems,     setRackItems]     = useState([])
+  const [placementComps, setPlacementComps] = useState({}) // placement_id → [label]
+  const [rackItemComps,  setRackItemComps]  = useState({}) // rack_item_id → [label]
+  const [cableRunsData,  setCableRunsData]  = useState([])
 
   const [activeSheetId, setActiveSheetId] = useState(null)
   const [comments,      setComments]      = useState([])
@@ -401,11 +407,50 @@ export default function DrawingReview() {
       setPlacements(sorted)
       setOrgProfile(profileData)
       setComments(commentData || [])
-      // Load IDF/MDF/HE room markers
-      const { data: roomData } = await supabase
-        .from('rooms').select('id, name, room_type, x, y, drawing_sheet_id, label_scale')
-        .eq('proposal_id', pkgData.proposal_id)
+      // Load rooms, racks, rack items, components, cable runs in parallel
+      const placementIds = (placementData || []).map(p => p.id)
+      const [
+        { data: roomData },
+        { data: cableData },
+        { data: placementCompData },
+      ] = await Promise.all([
+        supabase.from('rooms').select('id, name, room_type, x, y, drawing_sheet_id, label_scale').eq('proposal_id', pkgData.proposal_id),
+        sheetIds.length ? supabase.from('cable_runs').select('id, cable_type, from_placement_id, to_placement_id, points').in('drawing_sheet_id', sheetIds) : Promise.resolve({ data: [] }),
+        placementIds.length ? supabase.from('placement_components').select('placement_id, component_type, name, quantity').in('placement_id', placementIds) : Promise.resolve({ data: [] }),
+      ])
+      setAllRooms(roomData || [])
       setRooms((roomData || []).filter(r => ['idf','mdf','headend'].includes(r.room_type)))
+      setCableRunsData(cableData || [])
+      const pCompMap = {}
+      ;(placementCompData || []).forEach(c => {
+        if (!pCompMap[c.placement_id]) pCompMap[c.placement_id] = []
+        const lbl = (c.quantity > 1 ? `${c.name||c.component_type} ×${c.quantity}` : (c.name||c.component_type))
+        if (lbl && !pCompMap[c.placement_id].includes(lbl)) pCompMap[c.placement_id].push(lbl)
+      })
+      setPlacementComps(pCompMap)
+
+      // Racks + rack items
+      if (roomData?.length) {
+        const roomIds = roomData.map(r => r.id)
+        const { data: racks } = await supabase.from('racks').select('*').in('room_id', roomIds).order('sort_order,created_at')
+        setRackList(racks || [])
+        if (racks?.length) {
+          const rackIds = racks.map(r => r.id)
+          const { data: riData } = await supabase.from('rack_items').select('*, global_products(name, part_number, manufacturer, category)').in('rack_id', rackIds).order('u_start')
+          setRackItems(riData || [])
+          const riIds = (riData || []).map(r => r.id)
+          const { data: ricData } = riIds.length
+            ? await supabase.from('rack_item_components').select('rack_item_id, name, component_type, quantity').in('rack_item_id', riIds)
+            : { data: [] }
+          const ricMap = {}
+          ;(ricData || []).forEach(c => {
+            if (!ricMap[c.rack_item_id]) ricMap[c.rack_item_id] = []
+            const lbl = c.quantity > 1 ? `${c.name||c.component_type} ×${c.quantity}` : (c.name||c.component_type)
+            if (lbl && !ricMap[c.rack_item_id].includes(lbl)) ricMap[c.rack_item_id].push(lbl)
+          })
+          setRackItemComps(ricMap)
+        }
+      }
     } catch { setError('Failed to load drawing review.') }
     finally { setLoading(false) }
   }
@@ -460,6 +505,36 @@ export default function DrawingReview() {
       else alert('Approval failed. Please try again.')
     } catch { alert('Approval failed. Please try again.') }
     finally { setApproving(false) }
+  }
+
+  // Build cable type lookup from cable runs
+  const placementCableTypes = {}
+  const addCT = (pid, type) => {
+    if (!pid || !type || type === 'None') return
+    if (!placementCableTypes[pid]) placementCableTypes[pid] = new Set()
+    placementCableTypes[pid].add(type)
+  }
+  cableRunsData.forEach(r => {
+    if (!r.cable_type) return
+    addCT(r.from_placement_id, r.cable_type)
+    addCT(r.to_placement_id, r.cable_type)
+    if (Array.isArray(r.points)) r.points.forEach(pt => addCT(pt?.placement_id, r.cable_type))
+  })
+
+  // Group placements by category
+  const categoryGroups = {}
+  placements.forEach(p => {
+    const cat = p.global_products?.category || 'Uncategorized'
+    if (!categoryGroups[cat]) categoryGroups[cat] = []
+    categoryGroups[cat].push(p)
+  })
+  const sortedCategories = Object.keys(categoryGroups).sort()
+
+  const condBadge = (c) => {
+    if (c === 'existing') return <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50">Existing</span>
+    if (c === 'replace') return <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-700/50">Replace</span>
+    if (c === 'demo') return <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-700/50">Demo</span>
+    return <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/60 text-green-300 border border-green-700/50">New</span>
   }
 
   const activeSheet     = sheets.find(s => s.id === activeSheetId) || null
@@ -733,44 +808,82 @@ export default function DrawingReview() {
       </div>
 
       {/* Device schedule — collapsible footer */}
-      {placements.length > 0 && (
+      {(placements.length > 0 || rackItems.length > 0) && (
         <div className="border-t border-[#2a3d55] flex-shrink-0 bg-[#1a2d45]">
           <button onClick={() => setShowSchedule(s => !s)}
             className="w-full flex items-center justify-between px-5 py-2.5 text-xs font-semibold text-[#8A9AB0] hover:text-white transition-colors">
-            <span>Device Schedule ({placements.length} devices)</span>
+            <span>Device Schedule ({placements.length + rackItems.length} items)</span>
             <svg className={`w-3.5 h-3.5 transition-transform ${showSchedule ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
           {showSchedule && (
-            <div className="overflow-x-auto max-h-48 border-t border-[#2a3d55]">
+            <div className="overflow-x-auto max-h-56 border-t border-[#2a3d55]">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-[#0F1C2E] text-[#C8622A] text-left sticky top-0">
-                    {['#','Address','Condition','Part Number','Description','Manufacturer','Category','Sheet'].map(h => (
-                      <th key={h} className="px-4 py-2 font-semibold whitespace-nowrap">{h}</th>
+                    {['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Sheet','Runs To','Cable','Components'].map(h => (
+                      <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {placements.map((p, idx) => {
-                    const gp    = p.global_products
-                    const sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+                  {sortedCategories.map(cat => {
+                    const rows = categoryGroups[cat]
+                    return [
+                      <tr key={`cat-${cat}`} className="bg-[#0d1927]">
+                        <td colSpan={11} className="px-3 py-1 text-[#C8622A] font-bold text-[10px] uppercase tracking-wide">{cat}</td>
+                      </tr>,
+                      ...rows.map((p, idx) => {
+                        const gp  = p.global_products
+                        const sht = sheets.find(s => s.id === p.drawing_sheet_id)
+                        const rct = p.rise_cable_type && p.rise_cable_type !== 'None' ? p.rise_cable_type : null
+                        const ctSet = placementCableTypes[p.id]
+                        const cable = rct || (ctSet ? [...ctSet].join(', ') : '—')
+                        const comps = (placementComps[p.id] || []).join(', ') || '—'
+                        return (
+                          <tr key={p.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
+                            <td className="px-3 py-2 text-[#8A9AB0]">{idx + 1}</td>
+                            <td className="px-3 py-2 text-white font-medium whitespace-nowrap">{p.device_address || '—'}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0] font-mono whitespace-nowrap">{p.part_number_override || gp?.part_number || '—'}</td>
+                            <td className="px-3 py-2 text-white whitespace-nowrap">{p.description_override || gp?.name || '—'}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0]">{p.quantity || 1}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{condBadge(p.site_condition)}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{sht?.name || '—'}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{p.runs_to_label || '—'}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{cable}</td>
+                            <td className="px-3 py-2 text-[#8A9AB0]">{comps}</td>
+                          </tr>
+                        )
+                      })
+                    ]
+                  })}
+
+                  {rackItems.length > 0 && (
+                    <tr className="bg-[#0d1927]">
+                      <td colSpan={11} className="px-3 py-1 text-[#10b981] font-bold text-[10px] uppercase tracking-wide">Rooms / Rack Equipment</td>
+                    </tr>
+                  )}
+                  {rackItems.map((item, idx) => {
+                    const rack  = rackList.find(r => r.id === item.rack_id)
+                    const room  = allRooms.find(r => r.id === rack?.room_id)
+                    const gp    = item.global_products
+                    const comps = (rackItemComps[item.id] || []).join(', ') || '—'
+                    const location = room ? `${room.name} / ${rack?.name || 'Rack'}` : (rack?.name || '—')
                     return (
-                      <tr key={p.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
-                        <td className="px-4 py-2 text-[#8A9AB0]">{idx + 1}</td>
-                        <td className="px-4 py-2 text-white font-medium whitespace-nowrap">{p.device_address || '—'}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          {p.site_condition === 'existing' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50">Existing</span>}
-                          {p.site_condition === 'replace' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-700/50">Replace</span>}
-                          {p.site_condition === 'demo' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-700/50">Demo</span>}
-                          {(!p.site_condition || p.site_condition === 'new') && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/60 text-green-300 border border-green-700/50">New</span>}
-                        </td>
-                        <td className="px-4 py-2 text-[#8A9AB0] font-mono whitespace-nowrap">{p.part_number_override || gp?.part_number || '—'}</td>
-                        <td className="px-4 py-2 text-white whitespace-nowrap">{p.description_override || gp?.name || '—'}</td>
-                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
-                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{gp?.category || '—'}</td>
-                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{sheet?.name || '—'}</td>
+                      <tr key={item.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
+                        <td className="px-3 py-2 text-[#8A9AB0]">{idx + 1}</td>
+                        <td className="px-3 py-2 text-white font-medium whitespace-nowrap">{item.label || '—'}</td>
+                        <td className="px-3 py-2 text-[#8A9AB0] font-mono whitespace-nowrap">{item.part_number || item.model || gp?.part_number || '—'}</td>
+                        <td className="px-3 py-2 text-white whitespace-nowrap">{item.description || item.label || gp?.name || '—'}</td>
+                        <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{item.manufacturer || gp?.manufacturer || '—'}</td>
+                        <td className="px-3 py-2 text-[#8A9AB0]">{item.quantity || 1}</td>
+                        <td className="px-3 py-2 text-[#8A9AB0]">—</td>
+                        <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{location}</td>
+                        <td className="px-3 py-2 text-[#8A9AB0]">—</td>
+                        <td className="px-3 py-2 text-[#8A9AB0]">—</td>
+                        <td className="px-3 py-2 text-[#8A9AB0]">{comps}</td>
                       </tr>
                     )
                   })}
