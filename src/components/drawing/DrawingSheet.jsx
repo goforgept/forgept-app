@@ -596,8 +596,10 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     const size = 1280
     const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/${size}x${size}@1x?access_token=${token}`
     try {
+      console.log('Loading sitemap image:', url)
       await loadImageFromUrl(url)
-    } catch {
+    } catch (err) {
+      console.error('Sitemap image load error:', err, 'URL:', url)
       setError('Failed to load satellite image. Check your Mapbox token and internet connection.')
       setLoading(false)
     }
