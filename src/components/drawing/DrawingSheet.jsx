@@ -609,6 +609,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
     } catch (err) {
       console.error('Sitemap image load error:', err)
       setError('Failed to load satellite image. Check your Mapbox token and internet connection.')
+    } finally {
       setLoading(false)
     }
   }
