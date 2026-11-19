@@ -185,7 +185,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
   }, [totalRevenue, totalCost, hoursLogged, estimatedHours, laborQuotedRevenue, laborBudgetedCost])
 
   return (
-    <div className="bg-fp-card rounded-xl p-6">
+    <div className="bg-fp-card rounded-xl p-6 lg:mb-20">
       <div className="flex justify-between items-center mb-5">
         <h3 className="text-fp-text font-bold text-lg">Job Cost Report</h3>
         <button onClick={onExportPDF}
@@ -498,7 +498,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-fp-border">
-                    {['Role', 'Section', ...(locationBreakdown.length > 0 ? ['Location'] : []), 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
+                    {['Role', 'Section', ...(locationBreakdown.length > 0 ? ['Location'] : []), 'Planned Hrs', 'Your Cost/hr', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
                       <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
@@ -517,7 +517,8 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                         <td className="text-fp-muted py-2 pr-3">{l._sectionName || '—'}</td>
                         {locationBreakdown.length > 0 && <td className="text-fp-muted py-2 pr-3">{l._locationName || '—'}</td>}
                         <td className="text-fp-text py-2 pr-3">{qty > 0 ? `${qty} ${l.unit || 'hr'}` : '—'}</td>
-                        <td className="text-fp-text py-2 pr-3">${fmt(costPerUnit)}</td>
+                        <td className="text-fp-muted py-2 pr-3">${fmt(costPerUnit)}</td>
+                        <td className="text-fp-text py-2 pr-3 font-semibold">${fmt(totalCostRow)}</td>
                         <td className="text-fp-text py-2 pr-3">${fmt(revenue)}</td>
                         <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
                         <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
@@ -525,6 +526,19 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                     )
                   })}
                 </tbody>
+                {allLaborItems.length > 1 && (
+                  <tfoot>
+                    <tr className="border-t border-fp-border">
+                      <td colSpan={locationBreakdown.length > 0 ? 3 : 2} className="text-fp-muted pt-2 font-semibold">Total</td>
+                      <td className="text-fp-text pt-2 pr-3 font-semibold">{estimatedHours} hr</td>
+                      <td></td>
+                      <td className="text-fp-text pt-2 pr-3 font-semibold">${fmt(laborBudgetedCost)}</td>
+                      <td className="text-fp-text pt-2 pr-3 font-semibold">${fmt(laborQuotedRevenue)}</td>
+                      <td className={`pt-2 pr-3 font-semibold ${laborBudgetMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(laborBudgetMargin)}</td>
+                      <td className={`pt-2 font-semibold ${laborBudgetMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{laborBudgetMarginPct != null ? `${laborBudgetMarginPct}%` : '—'}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -564,7 +578,9 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                             <td className="text-fp-text py-2 pr-3 font-semibold">${fmt(t.cost)}</td>
                             <td className="py-2 pr-3">
                               {costDelta === null
-                                ? <span className="text-fp-muted">—</span>
+                                ? <span className="text-yellow-400 text-[10px]">
+                                    {t.role ? 'Role not in this job\'s labor' : 'Set a role in Settings → Team to compare'}
+                                  </span>
                                 : costDelta > 0.01
                                   ? <span className="text-red-400 font-semibold">+${fmt(costDelta)} over</span>
                                   : costDelta < -0.01
