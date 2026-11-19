@@ -288,6 +288,19 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
 const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
   const sheet = sheets.find(s => s.id === sheetId)
   if (!sheet || ['blank', 'pending'].includes(sheet.storage_path)) return null
+  if (sheet.storage_path === 'sitemap') {
+    if (!sheet.map_lat || !sheet.map_lng) return null
+    const token = import.meta.env.VITE_MAPBOX_TOKEN
+    if (!token) return null
+    const zoom = sheet.map_zoom || 18
+    const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/1280x1280?access_token=${token}`
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const blob = await res.blob()
+      return await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob) })
+    } catch { return null }
+  }
   try {
     const { getR2Url } = await import('../../r2')
     const signedUrl = await getR2Url(sheet.storage_path, 3600)
@@ -904,6 +917,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const getFloorPlanImage = async (sheetId) => {
     const sheet = sheets.find(s => s.id === sheetId)
     if (!sheet || ['blank', 'pending'].includes(sheet.storage_path)) return null
+    if (sheet.storage_path === 'sitemap') {
+      if (!sheet.map_lat || !sheet.map_lng) return null
+      const token = import.meta.env.VITE_MAPBOX_TOKEN
+      if (!token) return null
+      const zoom = sheet.map_zoom || 18
+      const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${sheet.map_lng},${sheet.map_lat},${zoom}/1280x1280?access_token=${token}`
+      try {
+        const res = await fetch(url)
+        if (!res.ok) return null
+        const blob = await res.blob()
+        return await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob) })
+      } catch { return null }
+    }
     try {
       const { getR2Url } = await import('../../r2')
       const signedUrl = await getR2Url(sheet.storage_path, 3600)
