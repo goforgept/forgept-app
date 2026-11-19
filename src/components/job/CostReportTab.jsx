@@ -597,23 +597,23 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
           </div>
         )}
 
-        {/* PM Labor True-Up */}
+        {/* PM True-Up — labor hours or materials installed */}
         {onAddManualEntry && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">PM Labor True-Up</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">PM True-Up</p>
               <button onClick={() => setShowTrueUp(v => !v)} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">
-                {showTrueUp ? 'Cancel' : '+ Add Manual Hours'}
+                {showTrueUp ? 'Cancel' : '+ Add Labor or Materials'}
               </button>
             </div>
             {showTrueUp && (
               <div className="bg-fp-inset rounded-xl p-4 space-y-3">
-                <p className="text-fp-muted text-xs">Add cost directly without a tech daily log — use to true-up hours or materials the PM managed.</p>
+                <p className="text-fp-muted text-xs">Claim labor hours or materials installed without a tech daily log — use to true-up work the PM managed.</p>
                 <div className="flex gap-2">
                   {['labor', 'materials'].map(t => (
                     <button key={t} onClick={() => setTrueUpType(t)}
                       className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${trueUpType === t ? 'bg-[#C8622A] text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border'}`}>
-                      {t === 'labor' ? 'Labor Hours' : 'Materials Cost'}
+                      {t === 'labor' ? 'Labor Hours' : 'Materials Installed'}
                     </button>
                   ))}
                 </div>
@@ -657,7 +657,7 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                       </div>
                       {trueUpForm.bomItemId ? (
                         <div className="col-span-2">
-                          <label className="text-fp-muted text-xs mb-1 block">Qty Used <span className="text-[#C8622A]">*</span></label>
+                          <label className="text-fp-muted text-xs mb-1 block">Qty Installed <span className="text-[#C8622A]">*</span></label>
                           <input type="number" min="0.01" step="0.01" placeholder="0"
                             value={trueUpForm.bomQty} onChange={e => setTrueUpForm(p => ({ ...p, bomQty: e.target.value }))}
                             className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
@@ -722,7 +722,19 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                     {techLogs.filter(l => l.is_manual_entry).map((l, i) => {
                       const isMat = l.hours_worked === 0 && l.materials_used
                       let matAdj = null
-                      if (isMat) { try { const p = JSON.parse(l.materials_used); matAdj = p?.find(m => m.id?.startsWith('adj_')) } catch {} }
+                      let matBom = null
+                      if (isMat) {
+                        try {
+                          const p = JSON.parse(l.materials_used)
+                          matAdj = p?.find(m => m.id?.startsWith('adj_'))
+                          const bomEntry = p?.find(m => !m.id?.startsWith('adj_'))
+                          if (bomEntry) {
+                            const item = lineItems.find(li => li.id === bomEntry.id)
+                            const qty = parseFloat(bomEntry.qty) || 0
+                            matBom = { name: bomEntry.name || item?.item_name, qty, unit: item?.unit || 'ea', cost: qty * (item?.your_cost_unit || 0) }
+                          }
+                        } catch {}
+                      }
                       return (
                         <tr key={i} className="border-b border-fp-border/30">
                           <td className="text-fp-muted py-1.5 pr-3">{l.log_date || '—'}</td>
@@ -731,10 +743,14 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                               {isMat ? 'Materials' : 'Labor'}
                             </span>
                           </td>
-                          <td className="text-fp-text py-1.5 pr-3">{isMat ? (matAdj?.name || '—') : (l.labor_role || 'Blended')}</td>
                           <td className="text-fp-text py-1.5 pr-3">
                             {isMat
-                              ? (matAdj ? `$${fmt(matAdj.cost)}` : '—')
+                              ? (matBom ? `${matBom.name || 'BOM item'} · ${matBom.qty} ${matBom.unit} installed` : (matAdj?.name || '—'))
+                              : (l.labor_role || 'Blended')}
+                          </td>
+                          <td className="text-fp-text py-1.5 pr-3">
+                            {isMat
+                              ? (matBom ? `$${fmt(matBom.cost)}` : matAdj ? `$${fmt(matAdj.cost)}` : '—')
                               : `${l.hours_worked} hrs${l.cost_per_hour != null ? ` @ $${fmt(l.cost_per_hour)}/hr` : ''}`
                             }
                           </td>
