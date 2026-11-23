@@ -295,6 +295,9 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         <div className="min-w-0">
           <p className="text-white text-sm font-semibold truncate">{product.name}</p>
           <p className="text-[#8A9AB0] text-xs">{product.manufacturer} · {product.category}</p>
+          {product.description && (
+            <p className="text-[#8A9AB0] text-xs mt-1 line-clamp-2" title={product.description}>{product.description}</p>
+          )}
         </div>
         <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors flex-shrink-0 ml-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -371,7 +374,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
               <label className={labelClass}>Description</label>
               <input type="text" value={form.description_override}
                 onChange={e => update('description_override', e.target.value)}
-                placeholder={product.name || product.description || 'e.g. 4MP IR IK10 Dome'}
+                placeholder={product.description || product.name || 'e.g. 4MP IR IK10 Dome'}
                 className={inputClass} />
             </div>
             <div>

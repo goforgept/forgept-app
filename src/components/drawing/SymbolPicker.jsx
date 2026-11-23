@@ -169,7 +169,8 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
         return s.name.toLowerCase().includes(q) ||
           s.part_number.toLowerCase().includes(q) ||
           s.model_number?.toLowerCase().includes(q) ||
-          s.category?.toLowerCase().includes(q)
+          s.category?.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q)
       })
     : symbols
 
@@ -234,6 +235,9 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
             <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10 flex-shrink-0">
               <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
               <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
+              {selectedSymbol.description && (
+                <p className="text-xs text-[#8A9AB0] mt-0.5 line-clamp-2" title={selectedSymbol.description}>{selectedSymbol.description}</p>
+              )}
               <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
             </div>
           )}
@@ -312,6 +316,9 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
             <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10 flex-shrink-0">
               <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
               <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
+              {selectedSymbol.description && (
+                <p className="text-xs text-[#8A9AB0] mt-0.5 line-clamp-2" title={selectedSymbol.description}>{selectedSymbol.description}</p>
+              )}
               <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
             </div>
           )}
@@ -552,7 +559,7 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
+        title={`${symbol.name}\n${symbol.part_number}${symbol.description ? `\n${symbol.description}` : ''}\nDrag to place · or tap to select then tap canvas`}
         className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
         <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
           <CategoryIcon category={symbol.category} />
