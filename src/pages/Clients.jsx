@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar'
 import { clientName } from '../utils/client'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { usePermissions } from '../hooks/usePermissions'
+import { normalizeLinkedIn } from '../lib/linkedin'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -132,12 +133,15 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
   const handleAddContact = async () => {
     if (!contactForm.full_name.trim()) { setError('Name is required'); return }
+    const li = normalizeLinkedIn(contactForm.linkedin_url)
+    if (li.error) { setError(li.error); return }
     setSaving(true)
     setError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     const { error } = await supabase.from('client_contacts').insert({
       ...contactForm,
+      linkedin_url: li.url,
       client_id: panel.clientId,
       org_id: profile.org_id,
       is_primary: false,
@@ -693,6 +697,15 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                 <label className="text-fp-muted text-xs mb-1 block">Phone</label>
                 <input type="text" value={contactForm.phone}
                   onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                />
+              </div>
+
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">LinkedIn</label>
+                <input type="url" value={contactForm.linkedin_url || ''}
+                  onChange={e => setContactForm(p => ({ ...p, linkedin_url: e.target.value }))}
+                  placeholder="linkedin.com/in/jane-smith"
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
               </div>

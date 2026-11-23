@@ -57,6 +57,7 @@ const TOOLS = [
         phone: { type: "string" }, address: { type: "string" }, city: { type: "string" },
         state: { type: "string" }, zip: { type: "string" }, website: { type: "string" },
         industry: { type: "string" }, notes: { type: "string" },
+        linkedin_url: { type: "string", description: "Company LinkedIn page, e.g. linkedin.com/company/acme" },
       },
       required: ["company"],
     },
@@ -70,6 +71,7 @@ const TOOLS = [
         company: { type: "string" }, email: { type: "string" }, phone: { type: "string" },
         address: { type: "string" }, city: { type: "string" }, state: { type: "string" },
         zip: { type: "string" }, website: { type: "string" }, industry: { type: "string" }, notes: { type: "string" },
+        linkedin_url: { type: "string", description: "Company LinkedIn page, e.g. linkedin.com/company/acme" },
       },
       required: ["company"],
     },
@@ -82,6 +84,20 @@ const TOOLS = [
       properties: {
         company: { type: "string" }, full_name: { type: "string" }, email: { type: "string" },
         phone: { type: "string" }, title: { type: "string" }, is_primary: { type: "boolean" },
+        linkedin_url: { type: "string", description: "Person's LinkedIn profile, e.g. linkedin.com/in/jane-smith" },
+      },
+      required: ["company", "full_name"],
+    },
+  },
+  {
+    name: "update_contact",
+    description: "Update an existing contact on a client account (title, email, phone, LinkedIn, primary flag). Finds the contact by company + name.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string" }, full_name: { type: "string", description: "Current name of the contact to update" },
+        email: { type: "string" }, phone: { type: "string" }, title: { type: "string" }, is_primary: { type: "boolean" },
+        linkedin_url: { type: "string", description: "Person's LinkedIn profile; empty string clears it" },
       },
       required: ["company", "full_name"],
     },
@@ -440,6 +456,20 @@ async function resolveOrCreateSection(supabase: any, proposalId: string, orgId: 
   return { id: newSec.id }
 }
 
+// ─── LinkedIn URL cleanup (mirrors src/lib/linkedin.jsx) ─────────────────────
+
+function normalizeLinkedIn(input: unknown): { url: string | null } | { error: string } {
+  const raw = typeof input === "string" ? input.trim() : ""
+  if (!raw) return { url: null }
+  let u: URL
+  try { u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`) } catch { return { error: "linkedin_url is not a valid URL" } }
+  const host = u.hostname.toLowerCase()
+  if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) return { error: "linkedin_url must be a linkedin.com link" }
+  const m = u.pathname.match(/^\/(in|company|school|pub)\/([^/]+)/i)
+  if (!m) return { error: "linkedin_url must be a profile (/in/…) or company (/company/…) link" }
+  return { url: `https://www.linkedin.com/${m[1].toLowerCase()}/${m[2]}` }
+}
+
 // ─── Tool execution ───────────────────────────────────────────────────────────
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string | null): Promise<any> {
@@ -457,9 +487,13 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
 
     case "get_client_overview": {
       const { data: client } = await supabase.from("clients")
-        .select("id, company, client_name, email, phone, address, city, state, website, notes")
+        .select("id, company, client_name, email, phone, address, city, state, website, linkedin_url, notes")
         .eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
       if (!client) return { error: `No client found matching "${input.company}".` }
+      const { data: contacts } = await supabase.from("client_contacts")
+        .select("full_name, title, email, phone, linkedin_url, is_primary")
+        .eq("org_id", orgId).eq("client_id", client.id)
+        .order("is_primary", { ascending: false }).order("full_name").limit(25)
       let proposalsQ = supabase.from("proposals").select("id, proposal_name, status, proposal_value")
         .eq("org_id", orgId).eq("client_id", client.id).limit(10)
       if (!input.include_all) proposalsQ = proposalsQ.not("status", "in", '("Won","Lost")')
@@ -472,11 +506,14 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         supabase.from("tasks").select("id, title, due_date, status")
           .eq("org_id", orgId).eq("client_id", client.id).neq("status", "completed").limit(5),
       ])
-      return { client, proposals: proposals || [], tickets: tickets || [], pending_tasks: tasks || [] }
+      return { client, contacts: contacts || [], proposals: proposals || [], tickets: tickets || [], pending_tasks: tasks || [] }
     }
 
     case "create_client": {
+      const li = normalizeLinkedIn(input.linkedin_url)
+      if ("error" in li) return { error: li.error }
       const { data, error } = await supabase.from("clients").insert({
+        linkedin_url: li.url,
         org_id: orgId, company: input.company, client_name: input.client_name || null,
         email: input.email || null, phone: input.phone || null, address: input.address || null,
         city: input.city || null, state: input.state || null, zip: input.zip || null,
@@ -493,6 +530,11 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const updates: Record<string, any> = {}
       const fields = ["email","phone","address","city","state","zip","website","industry","notes"]
       for (const f of fields) if (input[f] !== undefined) updates[f] = input[f]
+      if (input.linkedin_url !== undefined) {
+        const li = normalizeLinkedIn(input.linkedin_url)
+        if ("error" in li) return { error: li.error }
+        updates.linkedin_url = li.url
+      }
       if (Object.keys(updates).length === 0) return { error: "No fields provided to update." }
       const { error } = await supabase.from("clients").update(updates).eq("id", client.id)
       if (error) return { error: error.message }
@@ -503,13 +545,38 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const { data: client } = await supabase.from("clients")
         .select("id, company").eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
       if (!client) return { error: `No client found matching "${input.company}". Create the company first.` }
+      const li = normalizeLinkedIn(input.linkedin_url)
+      if ("error" in li) return { error: li.error }
       const { data, error } = await supabase.from("client_contacts").insert({
         org_id: orgId, client_id: client.id, full_name: input.full_name,
         email: input.email || null, phone: input.phone || null,
         title: input.title || null, is_primary: input.is_primary || false, notes: "",
+        linkedin_url: li.url,
       }).select("id, full_name").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, full_name: data.full_name, company: client.company, action: "created_contact" }
+    }
+
+    case "update_contact": {
+      const { data: client } = await supabase.from("clients")
+        .select("id, company").eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+      const { data: matches } = await supabase.from("client_contacts")
+        .select("id, full_name").eq("org_id", orgId).eq("client_id", client.id)
+        .ilike("full_name", `%${input.full_name}%`).limit(2)
+      if (!matches?.length) return { error: `No contact matching "${input.full_name}" at ${client.company}.` }
+      if (matches.length > 1) return { error: `More than one contact matches "${input.full_name}" at ${client.company}: ${matches.map((m: any) => m.full_name).join(", ")}. Use the full name.` }
+      const updates: Record<string, any> = {}
+      for (const f of ["email", "phone", "title", "is_primary"]) if (input[f] !== undefined) updates[f] = input[f]
+      if (input.linkedin_url !== undefined) {
+        const li = normalizeLinkedIn(input.linkedin_url)
+        if ("error" in li) return { error: li.error }
+        updates.linkedin_url = li.url
+      }
+      if (Object.keys(updates).length === 0) return { error: "No fields provided to update." }
+      const { error } = await supabase.from("client_contacts").update(updates).eq("id", matches[0].id)
+      if (error) return { error: error.message }
+      return { success: true, full_name: matches[0].full_name, company: client.company, updated_fields: Object.keys(updates), action: "updated_contact" }
     }
 
     case "search_proposals": {
