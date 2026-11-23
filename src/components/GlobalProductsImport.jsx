@@ -426,6 +426,7 @@ function buildTemplateProducts(headers, rows) {
       manufacturer: mfr,
       category:     get('Category') || 'Dome Camera',
       name:         get('Product Name') || `${mfr} ${partNum}`,
+      description:  get('Description') || null,
       part_number:  partNum,
       is_basic:     false,
       is_active:    true,
