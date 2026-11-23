@@ -774,12 +774,72 @@ const CATEGORY_SVGS = {
       <path d="M21 25 L19 22 L21 22 L19 17" stroke-width="1.3"/>
     </svg>`,
 
+  'Box Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="5" y="14" width="23" height="13" rx="1.5"/>
+      <rect x="28" y="16" width="7" height="9" rx="1"/>
+      <path d="M11 14 V10 H21 V14"/>
+    </svg>`,
+
+  'Modular Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="4" y="22" width="16" height="12" rx="2"/>
+      <circle cx="29" cy="12" r="6"/>
+      <circle cx="29" cy="12" r="2" fill="${color}"/>
+      <path d="M20 28 Q29 28 29 18"/>
+    </svg>`,
+
+  'Thermal Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="6" y="19" width="20" height="10" rx="2"/>
+      <path d="M26 21 L33 19 L33 29 L26 27 Z"/>
+      <path d="M11 15 Q13 12 11 9 M16 15 Q18 12 16 9 M21 15 Q23 12 21 9"/>
+    </svg>`,
+
+  'Explosion-Protected Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="2.2">
+      <rect x="5" y="13" width="23" height="14" rx="3"/>
+      <path d="M28 15 L35 13 L35 27 L28 25 Z" stroke-width="1.5"/>
+      <text x="9" y="23.5" font-size="8" font-weight="700" font-family="sans-serif" fill="${color}" stroke="none">Ex</text>
+    </svg>`,
+
+  'Body Worn Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="12" y="6" width="16" height="26" rx="3"/>
+      <circle cx="20" cy="15" r="4"/>
+      <circle cx="20" cy="26" r="1.5" fill="${color}"/>
+      <path d="M16 32 V36 M24 32 V36"/>
+    </svg>`,
+
+  'Security Radar': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="20" cy="31" r="2.5" fill="${color}"/>
+      <path d="M13 24 A10 10 0 0 1 27 24 M8 19 A17 17 0 0 1 32 19 M3 14 A24 24 0 0 1 37 14"/>
+    </svg>`,
+
+  'Audio Interface': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="12" width="32" height="16" rx="2"/>
+      <path d="M8 20 H11 L13 16 L16 24 L18 20 H21"/>
+      <circle cx="28" cy="20" r="2.5"/>
+    </svg>`,
+
+  'Video Decoder': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <path d="M4 16 L12 12 L12 28 L4 24 Z"/>
+      <rect x="12" y="12" width="24" height="16" rx="2"/>
+      <circle cx="30" cy="18" r="1.5" fill="${color}"/>
+      <circle cx="30" cy="22" r="1.5" fill="${color}"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>
       <circle cx="20" cy="20" r="4"/>
     </svg>`,
 }
+// Multi Sensor Camera is the category name the importers write; draw it like Multi-Lens.
+CATEGORY_SVGS['Multi Sensor Camera'] = CATEGORY_SVGS['Multi-Lens Camera']
 
 // ─── Cache for rendered icon images ───────────────────────────────────────────
 const iconCache = new Map()

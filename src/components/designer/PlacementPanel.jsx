@@ -12,7 +12,7 @@ const NO_CABLE_CATEGORIES = [
   'Surge Protector', 'Transformer', 'Wall Plate', 'Face Plate',
 ]
 
-const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera']
+const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera', 'Box Camera', 'Modular Camera', 'Thermal Camera', 'Explosion-Protected Camera', 'Turret Camera']
 
 const SENSOR_WIDTHS = {
   '1/4"': 3.68,
@@ -646,7 +646,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             </div>
 
             {/* FOV settings — cameras only */}
-            {[...CAMERA_CATEGORIES, 'Motion Sensor'].includes(product.category) && (
+            {[...CAMERA_CATEGORIES, 'Motion Sensor', 'Security Radar'].includes(product.category) && (
               <div className="border-t border-[#2a3d55] pt-3">
                 <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Coverage / FOV</p>
                 <div className="space-y-2">

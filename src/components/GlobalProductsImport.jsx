@@ -409,7 +409,7 @@ function guessIndustry(category) {
   if (['camera', 'reader', 'controller', 'nvr', 'sensor', 'intercom', 'lock', 'motion',
        'keypad', 'alarm', 'contact', 'siren', 'panic', 'detector', 'glass break', 'shock',
        'door operator', 'door opener', 'automatic door'].some(k => cat.includes(k))) return 'security'
-  if (['speaker', 'display', 'projector', 'amplifier', 'dsp', 'ceiling speaker', 'subwoofer', 'microphone'].some(k => cat.includes(k))) return 'av'
+  if (['speaker', 'display', 'projector', 'amplifier', 'dsp', 'ceiling speaker', 'subwoofer', 'microphone', 'audio'].some(k => cat.includes(k))) return 'av'
   if (['switch', 'patch', 'fiber', 'data', 'ups', 'rack', 'wireless ap'].some(k => cat.includes(k))) return 'low_voltage'
   if (['outlet', 'panel', 'conduit', 'lighting'].some(k => cat.includes(k))) return 'electrical'
   if (['diffuser', 'thermostat', 'vav'].some(k => cat.includes(k))) return 'hvac'
@@ -432,17 +432,19 @@ const ALL_CATEGORIES = [
   // Security — Cameras
   'Dome Camera','Bullet Camera','PTZ Camera','Fisheye Camera','Multi Sensor Camera','Indoor Camera',
   'Turret Camera','LPR Camera','Multi-Lens Camera',
+  'Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Body Worn Camera',
   // Security — Access Control
   'Access Control Enclosure','Access Reader','Access Control Door','Controller','Intercom','Wireless Lock','Door Operator',
   // Security — Intrusion
   'PIR Detector','Door Contact','Glass Break','Alarm Keypad','Alarm Panel','Interior Siren',
   'Exterior Siren','Panic Button','Shock Sensor','Dual Tech Detector','Motion Sensor',
   // Security — Video
-  'NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+  'NVR','Video Encoder','Video Decoder','Cabinet System','Cabinet Solar System','Security Radar',
   // AV
   'Projector','Projection Screen','Ceiling Speaker','Subwoofer','Microphone','Wireless Mic',
   'Touch Panel','Control Processor','Video Conference','Media Player','HDMI Extender',
   'AV Receiver','Digital Signage','Display','Document Camera','Streaming Encoder','Wall Plate','Clock',
+  'Speaker','Amplifier','Audio Interface',
   // Fire Alarm
   'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
   'Pull Station','Duct Detector','CO Detector','Beam Detector',
@@ -788,21 +790,21 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                         const VALID_CATEGORIES = [
                           'Access Control Door','Access Control Enclosure','Access Reader','Air Sampling','Alarm Keypad','Alarm Panel',
                           'Amplifier','Annunciator','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
-                          'Badging Station','Beam Detector','Bell','Bullet Camera',
-                          'Cabinet Solar System','Cabinet System','Cable Tray','CO Detector','Code Blue Light','Code Blue Panel','Code Blue Phone',
+                          'Audio Interface','Badging Station','Beam Detector','Bell','Body Worn Camera','Box Camera','Bullet Camera',
+                          'Cabinet Solar System','Cabinet System','Cable Tray','Ceiling Speaker','CO Detector','Code Blue Light','Code Blue Panel','Code Blue Phone',
                           'Control Module','Controller','Corridor Light','Data Drop',
                           'Display','Dome Camera','Dome Light','Door Contact','Door Holder','Door Operator','DSP','Duct Detector','Dual Tech Detector',
-                          'Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Fisheye Camera',
+                          'Explosion-Protected Camera','Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Fisheye Camera',
                           'Glass Break','Guard Tour','Heat Detector','Horn','Horn Strobe',
                           'Intercom','Interior Siren','IR Illuminator',
                           'KVM','LPR Camera','Lighting',
-                          'Mass Notification Speaker','Monitor Module','Motion Sensor','Multi-Lens Camera',
+                          'Mass Notification Speaker','Microphone','Modular Camera','Monitor Module','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera',
                           'Network','Nurse Call Controller','NVR',
                           'Outlet','Panel','Panic Button','Patch Panel','Patient Station','PIR Detector',
                           'PTZ Camera','Pull Cord Station','Pull Station',
-                          'Rack','Rack Server','Server','Shock Sensor','Smoke Detector','Speaker','Staff Station','Strobe','Suppression Panel',
-                          'Tamper Switch','Thermostat','Thick Client','Thin Client','Turret Camera',
-                          'UPS','Video Encoder','Waterflow Switch','Wireless Lock','Workstation',
+                          'Rack','Rack Server','Security Radar','Sensor','Server','Shock Sensor','Smoke Detector','Speaker','Staff Station','Strobe','Suppression Panel',
+                          'Tamper Switch','Thermal Camera','Thermostat','Thick Client','Thin Client','Turret Camera',
+                          'UPS','Video Decoder','Video Encoder','Waterflow Switch','Wireless Lock','Workstation',
                           'Other'
                         ]
 

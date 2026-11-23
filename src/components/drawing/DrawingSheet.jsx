@@ -18,6 +18,14 @@ const LABEL_PREFIXES = {
   'Multi-Lens Camera':       'CAM',
   'Multi Sensor Camera':     'CAM',
   'Fisheye Camera':          'CAM',
+  'Box Camera':              'CAM',
+  'Modular Camera':          'CAM',
+  'Thermal Camera':          'CAM',
+  'Explosion-Protected Camera': 'CAM',
+  'Body Worn Camera':        'BWC',
+  'Security Radar':          'RAD',
+  'Video Decoder':           'DEC',
+  'Audio Interface':         'AUD',
   'LPR Camera':              'LPR',
   'Cabinet System':          'CAB',
   'Cabinet Solar System':    'SOL',
@@ -2232,7 +2240,7 @@ export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSy
                   const product = placement.global_products
                   if (!product) return null
                   const category = product.category
-                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera']
+                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera', 'Box Camera', 'Modular Camera', 'Thermal Camera', 'Explosion-Protected Camera', 'Turret Camera', 'Security Radar']
                   if (!fovCategories.includes(category)) return null
 
                   const isSelected = selectedId === placement.id

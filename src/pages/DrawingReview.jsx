@@ -5,7 +5,7 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Line } fr
 import { useCategoryIcons } from '../components/drawing/useCategoryIcons'
 import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 
-const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
+const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera', 'Box Camera', 'Modular Camera', 'Thermal Camera', 'Explosion-Protected Camera', 'Turret Camera', 'Security Radar']
 
 // ── SheetCanvas ────────────────────────────────────────────────────────────────
 const ROOM_COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981' }

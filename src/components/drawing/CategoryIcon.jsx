@@ -10,6 +10,22 @@ export default function CategoryIcon({ category, size = 40 }) {
       return <svg {...props}><circle cx="20" cy="20" r="10" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/><path d="M20 8 L20 4 M20 36 L20 32 M8 20 L4 20 M36 20 L32 20" strokeWidth="1.5" strokeLinecap="round"/></svg>
     case 'Turret Camera':
       return <svg {...props}><ellipse cx="20" cy="26" rx="12" ry="5" strokeWidth="1.5"/><path d="M8 26 Q8 16 20 14 Q32 16 32 26" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" strokeWidth="1.5"/><circle cx="20" cy="20" r="2" fill="currentColor"/></svg>
+    case 'Box Camera':
+      return <svg {...props}><rect x="5" y="14" width="23" height="13" rx="1.5" strokeWidth="1.5"/><rect x="28" y="16" width="7" height="9" rx="1" strokeWidth="1.5"/><path d="M11 14 V10 H21 V14" strokeWidth="1.5"/></svg>
+    case 'Modular Camera':
+      return <svg {...props}><rect x="4" y="22" width="16" height="12" rx="2" strokeWidth="1.5"/><circle cx="29" cy="12" r="6" strokeWidth="1.5"/><circle cx="29" cy="12" r="2" fill="currentColor"/><path d="M20 28 Q29 28 29 18" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Thermal Camera':
+      return <svg {...props}><rect x="6" y="19" width="20" height="10" rx="2" strokeWidth="1.5"/><path d="M26 21 L33 19 L33 29 L26 27 Z" strokeWidth="1.5"/><path d="M11 15 Q13 12 11 9 M16 15 Q18 12 16 9 M21 15 Q23 12 21 9" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Explosion-Protected Camera':
+      return <svg {...props}><rect x="5" y="13" width="23" height="14" rx="3" strokeWidth="2.2"/><path d="M28 15 L35 13 L35 27 L28 25 Z" strokeWidth="1.5"/><text x="9" y="23.5" fontSize="8" fontWeight="700" fontFamily="sans-serif" fill="currentColor" stroke="none">Ex</text></svg>
+    case 'Body Worn Camera':
+      return <svg {...props}><rect x="12" y="6" width="16" height="26" rx="3" strokeWidth="1.5"/><circle cx="20" cy="15" r="4" strokeWidth="1.5"/><circle cx="20" cy="26" r="1.5" fill="currentColor"/><path d="M16 32 V36 M24 32 V36" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Security Radar':
+      return <svg {...props}><circle cx="20" cy="31" r="2.5" fill="currentColor"/><path d="M13 24 A10 10 0 0 1 27 24 M8 19 A17 17 0 0 1 32 19 M3 14 A24 24 0 0 1 37 14" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Audio Interface':
+      return <svg {...props}><rect x="4" y="12" width="32" height="16" rx="2" strokeWidth="1.5"/><path d="M8 20 H11 L13 16 L16 24 L18 20 H21" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="28" cy="20" r="2.5" strokeWidth="1.5"/></svg>
+    case 'Video Decoder':
+      return <svg {...props}><path d="M4 16 L12 12 L12 28 L4 24 Z" strokeWidth="1.5"/><rect x="12" y="12" width="24" height="16" rx="2" strokeWidth="1.5"/><circle cx="30" cy="18" r="1.5" fill="currentColor"/><circle cx="30" cy="22" r="1.5" fill="currentColor"/></svg>
     case 'Fisheye Camera': case 'Multi Sensor Camera': case 'Multi-Lens Camera': case 'Indoor Camera':
       return <svg {...props}><circle cx="20" cy="20" r="12" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" strokeWidth="1.5"/><circle cx="20" cy="20" r="2" fill="currentColor"/><path d="M14 10 L10 6 M26 10 L30 6" strokeWidth="1.2" strokeLinecap="round"/></svg>
     case 'LPR Camera':

@@ -11,7 +11,8 @@ const ALL_CATEGORIES = [
   'Access Control Enclosure',
   'Access Reader','Alarm Keypad','Alarm Panel','Amplifier','AV Receiver',
   'Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
-  'Badging Station',
+  'Audio Interface','Badging Station','Body Worn Camera','Box Camera','Explosion-Protected Camera',
+  'Modular Camera','Multi Sensor Camera','Security Radar','Thermal Camera','Turret Camera','Video Decoder','Video Encoder',
   'Code Blue Light','Code Blue Panel','Code Blue Phone',
   'Corridor Light',
   'Dome Light',
@@ -36,8 +37,8 @@ const ALL_CATEGORIES = [
 ]
 
 const CATEGORY_MAP = {
-  'Security':        ['Access Control Enclosure','Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Bullet Camera','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','IR Illuminator','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
-  'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
+  'Security':        ['Access Control Enclosure','Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Body Worn Camera','Box Camera','Bullet Camera','Explosion-Protected Camera','Modular Camera','Multi Sensor Camera','Security Radar','Thermal Camera','Turret Camera','Video Decoder','Video Encoder','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','IR Illuminator','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
+  'AV':              ['Accessory','Amplifier','Audio Interface','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
   'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
   'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],
   'Fire Alarm':      ['Accessory','Air Sampling','Alarm Keypad','Alarm Panel','Annunciator','Beam Detector','Bell','CO Detector','Control Module','Door Contact','Door Holder','Duct Detector','Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Heat Detector','Horn','Horn Strobe','Interior Siren','Mass Notification Speaker','Monitor Module','Motion Sensor','Panel','PIR Detector','Pull Station','Shock Sensor','Smoke Detector','Strobe','Suppression Panel','Tamper Switch','Waterflow Switch'],

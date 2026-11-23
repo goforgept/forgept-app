@@ -107,8 +107,8 @@ const loadOrgLogoFromProfile = async (orgProfile) => {
 
 // Maps device categories to higher-level system groups for schedule grouping
 const DEVICE_SYSTEM_GROUPS = [
-  { label: 'Security Systems',      categories: ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','Thermal Camera','Access Control Reader','Access Controller','Door Contact','Motion Sensor','Glass Break','Panic Button','Siren','Alarm Panel','Video Intercom','Intercom'] },
-  { label: 'Low Voltage / AV',      categories: ['TV Display','Projector','Speaker','Ceiling Speaker','Subwoofer','Amplifier','AV Receiver','Matrix Switch','Video Wall','Digital Signage','Control Processor','Keypad','Touch Panel','Display Mount'] },
+  { label: 'Security Systems',      categories: ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','Thermal Camera','Box Camera','Modular Camera','Explosion-Protected Camera','Turret Camera','Multi Sensor Camera','Body Worn Camera','Security Radar','Video Decoder','Access Control Reader','Access Controller','Door Contact','Motion Sensor','Glass Break','Panic Button','Siren','Alarm Panel','Video Intercom','Intercom'] },
+  { label: 'Low Voltage / AV',      categories: ['TV Display','Projector','Speaker','Ceiling Speaker','Subwoofer','Amplifier','Audio Interface','AV Receiver','Matrix Switch','Video Wall','Digital Signage','Control Processor','Keypad','Touch Panel','Display Mount'] },
   { label: 'Network / IT',          categories: ['Switch','Managed Switch','Router','Wireless AP','Firewall','UPS','Patch Panel','Server','Rack Server','Media Converter','SFP Module','Media Panel'] },
   { label: 'Infrastructure',        categories: ['Rack','Rack Enclosure','Cable Management','Power Strip','PDU','J-Hook','Conduit','Back Box','Junction Box','Low Voltage Bracket'] },
 ]
@@ -220,7 +220,7 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
     if (!isFinite(px) || !isFinite(py)) continue
     const col = p.marker_color || '#C8622A'
     const r = parseInt(col.slice(1,3),16), g = parseInt(col.slice(3,5),16), b = parseInt(col.slice(5,7),16)
-    const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera']
+    const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera','Security Radar']
     const category = p.global_products?.category || ''
     if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
       const fovAngle = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
@@ -1038,7 +1038,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const b   = parseInt(col.slice(5,7),16)
 
       // FOV cone — mirrors canvas rendering in DrawingSheet
-      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera']
+      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera','Security Radar']
       const category = p.global_products?.category || ''
       if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
@@ -1174,7 +1174,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
   // ── DORI Report PDF ────────────────────────────────────────────────────────
   const handleDoriExport = async () => {
-    const CAMERA_CATS = ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera']
+    const CAMERA_CATS = ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera']
     const THRESHOLDS  = [
       { label: 'Detection',      ppm: 25  },
       { label: 'Observation',    ppm: 62  },
@@ -2515,10 +2515,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     {
       id:          'dori',
       label:       'DORI Analysis Report',
-      description: `IEC 62676-4 detection/observation/recognition/identification distances for all cameras. ${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length} camera${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length !== 1 ? 's' : ''}.`,
+      description: `IEC 62676-4 detection/observation/recognition/identification distances for all cameras. ${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera'].includes(p.global_products?.category)).length} camera${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera'].includes(p.global_products?.category)).length !== 1 ? 's' : ''}.`,
       icon:        '🎯',
       action:      handleDoriExport,
-      disabled:    placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length === 0,
+      disabled:    placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera','Box Camera','Modular Camera','Thermal Camera','Explosion-Protected Camera','Turret Camera'].includes(p.global_products?.category)).length === 0,
     },
     {
       id:          'racks',

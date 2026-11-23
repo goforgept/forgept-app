@@ -42,13 +42,13 @@ function getCatStyle(cat) {
   const c = (cat || '').toLowerCase()
   if (c.includes('switch') || c.includes('network') || c.includes('router') || c.includes('patch') || c.includes('fiber') || c.includes('wireless ap'))
     return { bar: '#3b82f6', bg: 'rgba(59,130,246,0.15)', text: '#93c5fd' }
-  if (c.includes('nvr') || c.includes('camera') || c.includes('encoder') || c.includes('cabinet') || c.includes('turret'))
+  if (c.includes('nvr') || c.includes('camera') || c.includes('encoder') || c.includes('decoder') || c.includes('cabinet') || c.includes('turret'))
     return { bar: '#10b981', bg: 'rgba(16,185,129,0.15)', text: '#6ee7b7' }
   if (c.includes('ups') || c.includes('power') || c.includes('pdu') || c.includes('battery') || c.includes('solar'))
     return { bar: '#f59e0b', bg: 'rgba(245,158,11,0.15)', text: '#fcd34d' }
   if (c.includes('fire') || c.includes('alarm') || c.includes('facp') || c.includes('suppression') || c.includes('annun') || c.includes('smoke') || c.includes('heat') || c.includes('horn') || c.includes('strobe'))
     return { bar: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#fca5a5' }
-  if (c.includes('speaker') || c.includes('paging') || c.includes('display') || c.includes('projector') || c.includes('amplif') || c.includes('receiver') || c.includes('dsp') || c.includes('control processor') || c.includes('touch panel'))
+  if (c.includes('speaker') || c.includes('paging') || c.includes('display') || c.includes('projector') || c.includes('amplif') || c.includes('audio') || c.includes('receiver') || c.includes('dsp') || c.includes('control processor') || c.includes('touch panel'))
     return { bar: '#a855f7', bg: 'rgba(168,85,247,0.15)', text: '#d8b4fe' }
   if (c.includes('access') || c.includes('reader') || c.includes('controller') || c.includes('intercom') || c.includes('lock'))
     return { bar: '#06b6d4', bg: 'rgba(6,182,212,0.15)', text: '#67e8f9' }
@@ -703,10 +703,10 @@ function WallMountList({ rack, items, selectedItemId, selectedRackId, onAddItem,
 
 const RACK_ITEM_CATEGORIES = [
   'Access Reader', 'Access Control Door', 'Controller', 'Wireless Lock', 'Door Contact', 'Motion Sensor', 'PIR Detector',
-  'Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Turret Camera', 'Fisheye Camera', 'LPR Camera', 'NVR', 'Video Encoder', 'Cabinet System', 'Cabinet Solar System',
+  'Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Turret Camera', 'Fisheye Camera', 'LPR Camera', 'NVR', 'Video Encoder', 'Video Decoder', 'Cabinet System', 'Cabinet Solar System',
   'FACP', 'Smoke Detector', 'Heat Detector', 'Pull Station', 'Horn Strobe', 'Horn', 'Bell', 'Strobe', 'CO Detector', 'Beam Detector', 'Annunciator', 'Monitor Module', 'Control Module', 'Duct Detector', 'Air Sampling', 'Suppression Panel',
   'Network', 'UPS', 'Power Supply', 'PDU', 'Panel', 'Rack', 'Server', 'Patch Panel', 'Fiber Panel',
-  'Display', 'Ceiling Speaker', 'Speaker', 'Paging Speaker', 'IP Paging Device', 'Paging Amplifier', 'Paging Controller', 'Subwoofer', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel', 'DSP Amplifier',
+  'Display', 'Ceiling Speaker', 'Speaker', 'Paging Speaker', 'IP Paging Device', 'Paging Amplifier', 'Paging Controller', 'Subwoofer', 'Amplifier', 'Audio Interface', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel', 'DSP Amplifier',
   'Other',
 ]
 
