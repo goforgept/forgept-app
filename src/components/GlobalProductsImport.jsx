@@ -348,12 +348,57 @@ async function parseForgePtCSV(file) {
   if (lines.length < 2) throw new Error('CSV appears empty')
 
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+  const rows = lines.slice(1)
+    .filter(line => !line.startsWith('EXAMPLE-') && !line.startsWith('#'))
+    .map(parseCSVLine)
+  return { elementType: 'ForgePt CSV Template', products: buildTemplateProducts(headers, rows) }
+}
+
+// ─── Parse ForgePt template saved as .xlsx ────────────────────────────────────
+// Returns null when the workbook isn't in ForgePt template format, so the caller
+// can fall back to the System Surveyor parser.
+async function parseForgePtXlsx(file) {
+  const ExcelJS  = (await import('exceljs')).default
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(await file.arrayBuffer())
+
+  const cellText = (v) => {
+    if (v == null) return ''
+    if (typeof v === 'object') {
+      if (v.richText) return v.richText.map(r => r.text).join('')
+      if (v.result !== undefined) return v.result == null ? '' : String(v.result)
+      if (v.text) return String(v.text)
+      return ''
+    }
+    return String(v)
+  }
+  const isTemplateHeader = (h) => {
+    const lower = h.map(x => x.toLowerCase())
+    return ['part number', 'manufacturer', 'category'].every(k => lower.some(x => x.includes(k)))
+  }
+
+  const sheets = [...workbook.worksheets].sort((a, b) => (b.name === 'Products') - (a.name === 'Products'))
+  for (const ws of sheets) {
+    const header = []
+    ws.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => { header[col - 1] = cellText(cell.value).trim() })
+    if (!isTemplateHeader(header)) continue
+
+    const rows = []
+    ws.eachRow((row, rowNum) => {
+      if (rowNum === 1) return
+      const vals = header.map((_, i) => cellText(row.getCell(i + 1).value))
+      if (vals[0]?.startsWith('EXAMPLE-')) return
+      rows.push(vals)
+    })
+    return { elementType: 'ForgePt Template (.xlsx)', products: buildTemplateProducts(header, rows) }
+  }
+  return null
+}
+
+function buildTemplateProducts(headers, rows) {
   const products = []
 
-  for (const line of lines.slice(1)) {
-    if (line.startsWith('EXAMPLE-')) continue
-    if (line.startsWith('#')) continue
-    const vals = parseCSVLine(line)
+  for (const vals of rows) {
     if (vals.length < 2) continue
 
     const get = (name) => {
@@ -388,7 +433,7 @@ async function parseForgePtCSV(file) {
     })
   }
 
-  return { elementType: 'ForgePt CSV Template', products: dedupeByPartNumber(products) }
+  return dedupeByPartNumber(products)
 }
 
 function parseCSVLine(line) {
@@ -488,8 +533,10 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 
     try {
       const isCSV = file.name.toLowerCase().endsWith('.csv')
-      setFileType(isCSV ? 'csv' : 'ss')
-      const result = isCSV ? await parseForgePtCSV(file) : await parseSystemSurveyorFile(file)
+      // A .xlsx can be either the ForgePt template or a System Surveyor export.
+      const template = isCSV ? null : await parseForgePtXlsx(file).catch(() => null)
+      setFileType(isCSV || template ? 'csv' : 'ss')
+      const result = isCSV ? await parseForgePtCSV(file) : (template || await parseSystemSurveyorFile(file))
 
       if (result.products.length === 0) {
         setError('No products found in this file. Make sure it is a valid System Surveyor Element Profile or ForgePt CSV template.')
