@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { usePermissions } from '../hooks/usePermissions'
-import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER, BulkTagBar } from '../components/tags/tags'
 
 export default function Proposals({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
@@ -19,6 +19,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER)
   const tagApi = useTags(['client', 'proposal'])
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
   const [dateRange, setDateRange] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -212,6 +214,14 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                 {showArchived ? '← Active' : `Archive (${archivedCount})`}
               </button>
             )}
+            {!showArchived && canWrite('proposals') && (
+              <button
+                onClick={() => { setSelectMode(m => !m); setSelected(new Set()) }}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${selectMode ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}
+              >
+                {selectMode ? 'Cancel' : 'Select'}
+              </button>
+            )}
             {!showArchived && (
               <button
                 onClick={() => canWrite('proposals') && navigate('/new')}
@@ -343,12 +353,28 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
           <p className="text-fp-muted">{showArchived ? 'No archived proposals.' : 'No proposals match your search.'}</p>
         ) : (
           <div className="space-y-3">
+            {selectMode && (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-fp-muted">Click proposals to select them.</span>
+                <button onClick={() => setSelected(new Set(filtered.map(p => p.id)))} className="text-fp-brand font-semibold">Select all {filtered.length} shown</button>
+                {selected.size > 0 && <button onClick={() => setSelected(new Set())} className="text-fp-muted hover:text-fp-text">Clear</button>}
+              </div>
+            )}
             {filtered.map((proposal) => (
               <div
                 key={proposal.id}
-                onClick={() => navigate(`/proposal/${proposal.id}`)}
-                className="group bg-fp-card rounded-xl p-5 flex justify-between items-center cursor-pointer hover:bg-fp-hover transition-colors"
+                onClick={() => {
+                  if (!selectMode) return navigate(`/proposal/${proposal.id}`)
+                  setSelected(prev => { const n = new Set(prev); n.has(proposal.id) ? n.delete(proposal.id) : n.add(proposal.id); return n })
+                }}
+                className={`group bg-fp-card rounded-xl p-5 flex justify-between items-center cursor-pointer hover:bg-fp-hover transition-colors ${selectMode && selected.has(proposal.id) ? 'ring-1 ring-fp-brand' : ''}`}
               >
+                <div className="flex items-start gap-3">
+                {selectMode && (
+                  <span className={`mt-1 w-5 h-5 shrink-0 rounded border-2 flex items-center justify-center text-xs ${selected.has(proposal.id) ? 'bg-[#C8622A] border-[#C8622A] text-white' : 'border-fp-border bg-fp-inset'}`} aria-hidden="true">
+                    {selected.has(proposal.id) ? '✓' : ''}
+                  </span>
+                )}
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-fp-text font-semibold">{proposal.proposal_name}</p>
@@ -365,6 +391,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   <p className="text-fp-muted text-sm">{proposal.company} · {proposal.rep_name}</p>
                   <p className="text-fp-muted text-xs">{proposal.rep_email}</p>
                   <div className="mt-1"><TagList tags={tagApi.tagsFor('proposal', proposal.id)} inherited={proposal.client_id ? tagApi.tagsFor('client', proposal.client_id) : []} max={4} /></div>
+                </div>
                 </div>
                 <div className="flex items-center gap-4">
                   {(proposal.subtotal_value ?? proposal.proposal_value) > 0 && (
@@ -406,6 +433,11 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
       </div>
+      {selectMode && (
+        <BulkTagBar api={tagApi} entity="proposal" noun={selected.size === 1 ? 'proposal' : 'proposals'}
+          count={selected.size} ids={[...selected]}
+          onClear={() => { setSelectMode(false); setSelected(new Set()) }} />
+      )}
     </div>
   )
 }

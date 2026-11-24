@@ -6,7 +6,7 @@ import { clientName } from '../utils/client'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { usePermissions } from '../hooks/usePermissions'
 import { normalizeLinkedIn } from '../lib/linkedin'
-import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER, BulkTagBar } from '../components/tags/tags'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -62,6 +62,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [showArchived, setShowArchived] = useState(false)
   const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER)
   const tagApi = useTags(['client'])
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(() => new Set()) // company names
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
@@ -251,6 +253,14 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                 {showArchived ? '← Active' : `Archive (${archivedCount})`}
               </button>
             )}
+            {!showArchived && canWrite('clients') && (
+              <button
+                onClick={() => { setSelectMode(m => !m); setSelected(new Set()) }}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${selectMode ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}
+              >
+                {selectMode ? 'Cancel' : 'Select'}
+              </button>
+            )}
             {!showArchived && (
               <button
                 onClick={() => canWrite('clients') && (setShowModal(true), setError(null))}
@@ -297,6 +307,14 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
           <TagFilter tags={tagApi.tags} value={tagFilter} onChange={setTagFilter} />
         </div>
 
+        {selectMode && (
+          <div className="flex items-center gap-3 text-sm -mt-2">
+            <span className="text-fp-muted">Click clients to select them.</span>
+            <button onClick={() => setSelected(new Set(filtered.map(c => c.company)))} className="text-fp-brand font-semibold">Select all {filtered.length} shown</button>
+            {selected.size > 0 && <button onClick={() => setSelected(new Set())} className="text-fp-muted hover:text-fp-text">Clear</button>}
+          </div>
+        )}
+
         {/* Cards grid */}
         {loading ? (
           <p className="text-fp-muted">Loading...</p>
@@ -316,9 +334,17 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
               return (
                 <div
                   key={company}
-                  onClick={() => navigate(`/client/${navigateTo}`)}
-                  className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover hover:border-fp-brand/40 border border-fp-border transition-all group"
+                  onClick={() => {
+                    if (!selectMode) return navigate(`/client/${navigateTo}`)
+                    setSelected(prev => { const n = new Set(prev); n.has(company) ? n.delete(company) : n.add(company); return n })
+                  }}
+                  className={`bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover border transition-all group relative ${selectMode && selected.has(company) ? 'border-fp-brand ring-1 ring-fp-brand' : 'border-fp-border hover:border-fp-brand/40'}`}
                 >
+                  {selectMode && (
+                    <span className={`absolute top-3 right-3 w-5 h-5 rounded border-2 flex items-center justify-center text-xs ${selected.has(company) ? 'bg-[#C8622A] border-[#C8622A] text-white' : 'border-fp-border bg-fp-inset'}`} aria-hidden="true">
+                      {selected.has(company) ? '✓' : ''}
+                    </span>
+                  )}
                   {/* Card header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -660,6 +686,13 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
             </div>
           </div>
         </div>
+      )}
+
+      {selectMode && (
+        <BulkTagBar api={tagApi} entity="client" noun={selected.size === 1 ? 'client' : 'clients'}
+          count={selected.size}
+          ids={companies.filter(c => selected.has(c.company)).flatMap(c => c.contacts.map(x => x.id))}
+          onClear={() => { setSelectMode(false); setSelected(new Set()) }} />
       )}
 
       {/* Add Contact Panel (inserts to client_contacts) */}

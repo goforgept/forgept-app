@@ -8,6 +8,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useTags } from '../components/tags/tags'
 
 // ── Multi-select searchable combobox ──────────────────────────────────────────
 function MultiSelect({ options, selected, onChange, placeholder = 'Search…' }) {
@@ -138,6 +139,7 @@ const ALL_NAV_GROUPS = [
       { key: 'open_quotes', label: 'Open Quotes',  icon: '📋' },
       { key: 'won_quotes',  label: 'Won Quotes',   icon: '🏆' },
       { key: 'lost_quotes', label: 'Lost Quotes',  icon: '❌' },
+      { key: 'tag_summary', label: 'Sales by Tag', icon: '🏷️' },
     ]
   },
   {
@@ -179,9 +181,10 @@ const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs']
 const GRAY_DATE_FILTER = ['user_activity', 'client_report']
 
 const REPORT_FILTERS = {
-  open_quotes:      ['clients', 'rep', 'industry'],
-  won_quotes:       ['clients', 'rep', 'industry'],
-  lost_quotes:      ['clients', 'rep', 'industry'],
+  open_quotes:      ['clients', 'rep', 'industry', 'tag'],
+  won_quotes:       ['clients', 'rep', 'industry', 'tag'],
+  lost_quotes:      ['clients', 'rep', 'industry', 'tag'],
+  tag_summary:      ['rep', 'industry'],
   open_jobs:        ['clients'],
   closed_jobs:      ['clients'],
   service_tickets:  ['clients', 'tech', 'status', 'priority'],
@@ -198,7 +201,7 @@ function today()    { return new Date().toISOString().slice(0, 10) }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const fmt$ = (n) => n != null ? `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'
 
-const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '' }
+const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '', tag: '' }
 
 export default function Reports(props) {
   const { profile } = useProfile()
@@ -208,6 +211,10 @@ export default function Reports(props) {
 
   const orgType   = profile?.organizations?.org_type || 'integrator'
   const navGroups = getNavGroups(orgType)
+  const tagApi    = useTags(['client', 'proposal'])
+  // A deal's tags = its own + its client's
+  const dealTagIds = (p) => [...new Set([...(tagApi.links.proposal[p.id] || []), ...(p.client_id ? (tagApi.links.client[p.client_id] || []) : [])])]
+  const tagNames   = (ids) => ids.map(id => tagApi.tagById[id]?.name).filter(Boolean).sort().join(', ')
 
   const [activeReport, setActiveReport] = useState('open_quotes')
   const [dateFrom, setDateFrom]         = useState(daysAgo(90))
@@ -289,7 +296,7 @@ export default function Reports(props) {
 
   useEffect(() => {
     if (profile?.org_id && activeReport !== 'client_report') fetchReport()
-  }, [profile?.org_id, activeReport, dateFrom, dateTo, filters])
+  }, [profile?.org_id, activeReport, dateFrom, dateTo, filters, tagApi.ready])
 
   const switchReport = (key) => {
     setActiveReport(key)
@@ -320,7 +327,7 @@ export default function Reports(props) {
       const statusMap = { open_quotes: ['Draft', 'Sent'], won_quotes: ['Won'], lost_quotes: ['Lost'] }
       let q = supabase
         .from('proposals')
-        .select('proposal_name, quote_number, status, client_name, company, industry, proposal_value, total_gross_margin_percent, close_date, created_at, rep_name')
+        .select('id, client_id, proposal_name, quote_number, status, client_name, company, industry, proposal_value, total_gross_margin_percent, close_date, created_at, rep_name')
         .eq('org_id', profile.org_id)
         .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
@@ -337,9 +344,10 @@ export default function Reports(props) {
         const orStr = selectedClientNames.flatMap(n => [`company.ilike.%${n}%`, `client_name.ilike.%${n}%`]).join(',')
         q = q.or(orStr)
       }
-      const { data: rows, error } = await q
+      const { data: rawRows, error } = await q
       if (error) console.error(error)
-      setData((rows || []).map(r => ({
+      const rows = filters.tag ? (rawRows || []).filter(r => dealTagIds(r).includes(filters.tag)) : (rawRows || [])
+      setData(rows.map(r => ({
         'Quote #':    r.quote_number || '—',
         'Name':       r.proposal_name || '—',
         'Status':     r.status,
@@ -350,7 +358,56 @@ export default function Reports(props) {
         'Margin':     r.total_gross_margin_percent ? `${Number(r.total_gross_margin_percent).toFixed(1)}%` : '—',
         'Close Date': r.close_date || '—',
         'Created':    r.created_at?.slice(0, 10) || '—',
+        ...(tagApi.tags.length ? { 'Tags': tagNames(dealTagIds(r)) || '—' } : {}),
       })))
+    }
+
+    // ── Sales by Tag ──────────────────────────────────────────────────────────
+    if (activeReport === 'tag_summary') {
+      let q = supabase
+        .from('proposals')
+        .select('id, client_id, status, proposal_value, subtotal_value, rep_name, industry, created_at')
+        .eq('org_id', profile.org_id)
+        .eq('is_current_revision', true)
+        .is('archived_at', null)
+      if (from) q = q.gte('created_at', from)
+      if (to)   q = q.lte('created_at', to + 'T23:59:59')
+      if (filters.rep) q = q.eq('rep_name', filters.rep)
+      else if (regionRepNames !== null && regionRepNames.length > 0) q = q.in('rep_name', regionRepNames)
+      if (filters.industry) q = q.eq('industry', filters.industry)
+      const { data: deals, error } = await q.limit(10000)
+      if (error) console.error(error)
+      const blank = () => ({ open: 0, openVal: 0, won: 0, wonVal: 0, lost: 0 })
+      const byTag = {}
+      const add = (key, d) => {
+        const b = (byTag[key] ||= blank())
+        const v = Number(d.subtotal_value ?? d.proposal_value) || 0
+        if (d.status === 'Won') { b.won++; b.wonVal += v }
+        else if (d.status === 'Lost') b.lost++
+        else { b.open++; b.openVal += v }
+      }
+      for (const d of deals || []) {
+        const ids = dealTagIds(d)
+        if (!ids.length) add('__untagged', d)
+        for (const id of ids) add(id, d)
+      }
+      const row = (label, b) => ({
+        'Tag':          label,
+        'Open Deals':   b.open,
+        'Open Value':   fmt$(b.openVal),
+        'Won Deals':    b.won,
+        'Won Value':    fmt$(b.wonVal),
+        'Lost Deals':   b.lost,
+        'Win Rate':     b.won + b.lost ? `${Math.round(100 * b.won / (b.won + b.lost))}%` : '—',
+        'Avg Won Deal': b.won ? fmt$(b.wonVal / b.won) : '—',
+        _sort: b.wonVal + b.openVal,
+      })
+      const rows = Object.entries(byTag)
+        .filter(([k]) => k !== '__untagged')
+        .map(([id, b]) => row(tagApi.tagById[id]?.name || 'Deleted tag', b))
+        .sort((a, b) => b._sort - a._sort)
+      if (byTag.__untagged) rows.push(row('(No tags)', byTag.__untagged))
+      setData(rows.map(({ _sort, ...r }) => r))
     }
 
     // ── Jobs ──────────────────────────────────────────────────────────────────
@@ -1257,6 +1314,15 @@ export default function Reports(props) {
                             </select>
                           </div>
                         )}
+                        {activeFilters.includes('tag') && tagApi.tags.length > 0 && (
+                          <div>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Tag</label>
+                            <select value={filters.tag} onChange={e => setFilter('tag', e.target.value)} className={selClass}>
+                              <option value="">All Tags</option>
+                              {tagApi.tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                        )}
                         {activeFilters.includes('tech') && (
                           <div>
                             <label className="block text-fp-muted text-xs font-medium mb-1">Technician</label>
@@ -1299,7 +1365,7 @@ export default function Reports(props) {
                             />
                           </div>
                         )}
-                        {(filters.clients.length > 0 || filters.rep || filters.industry || filters.tech || filters.status || filters.priority || filters.vendorName) && (
+                        {(filters.clients.length > 0 || filters.rep || filters.industry || filters.tech || filters.status || filters.priority || filters.vendorName || filters.tag) && (
                           <div className="self-end pb-0.5">
                             <button onClick={() => setFilters(BLANK_FILTERS)} className="text-xs px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">Clear filters</button>
                           </div>

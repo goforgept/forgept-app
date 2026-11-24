@@ -131,6 +131,30 @@ export function useTags(entities = ['client', 'contact', 'proposal']) {
     if (error) reload()
   }, [reload])
 
+  /** Add one tag to many records at once. */
+  const bulkAdd = useCallback(async (entity, ids, tagId) => {
+    const { table, col } = TAG_LINKS[entity]
+    const rows = [...new Set(ids)].map(id => ({ [col]: id, tag_id: tagId, org_id: orgId }))
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from(table).upsert(rows.slice(i, i + 500), { onConflict: `${col},tag_id`, ignoreDuplicates: true })
+      if (error) { await reload(); return { error: error.message } }
+    }
+    await reload()
+    return { ok: true }
+  }, [orgId, reload])
+
+  /** Remove one tag from many records at once. */
+  const bulkRemove = useCallback(async (entity, ids, tagId) => {
+    const { table, col } = TAG_LINKS[entity]
+    const list = [...new Set(ids)]
+    for (let i = 0; i < list.length; i += 200) {
+      const { error } = await supabase.from(table).delete().eq('tag_id', tagId).in(col, list.slice(i, i + 200))
+      if (error) { await reload(); return { error: error.message } }
+    }
+    await reload()
+    return { ok: true }
+  }, [reload])
+
   /** Create a tag (or return the existing one with the same name). */
   const create = useCallback(async (name, color) => {
     const clean = norm(name).slice(0, 40)
@@ -153,7 +177,7 @@ export function useTags(entities = ['client', 'contact', 'proposal']) {
     return data
   }, [tags, orgId, profile?.id])
 
-  return { tags, tagById, links, tagsFor, add, remove, create, reload, ready, canCreate: isAdmin || !adminOnly, isAdmin, adminOnly, setAdminOnly }
+  return { tags, tagById, links, tagsFor, add, remove, bulkAdd, bulkRemove, create, reload, ready, canCreate: isAdmin || !adminOnly, isAdmin, adminOnly, setAdminOnly }
 }
 
 // ── Chip ─────────────────────────────────────────────────────────────────────
@@ -339,6 +363,92 @@ export function TagFilter({ tags, value = EMPTY_TAG_FILTER, onChange }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Bulk bar: shown while records are selected ──────────────────────────────
+/**
+ * `ids` = record ids the action applies to (for a client card, all client rows in that company).
+ * `count` = how many items the user selected (for the label).
+ */
+export function BulkTagBar({ api, entity, ids, count, onClear, noun = 'items' }) {
+  const [mode, setMode] = useState(null) // 'add' | 'remove' | null
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    if (!mode) return
+    const close = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) { setMode(null); setQ('') } }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [mode])
+
+  if (!count) return null
+  const idSet = new Set(ids)
+  // For "remove", only offer tags at least one selected record has
+  const present = new Set(ids.flatMap(id => api.links[entity]?.[id] || []))
+  const pool = mode === 'remove' ? api.tags.filter(t => present.has(t.id)) : api.tags
+  const query = norm(q)
+  const list = pool.filter(t => !query || key(t.name).includes(key(query))).slice(0, 10)
+  const exact = api.tags.find(t => key(t.name) === key(query))
+  const similar = mode === 'add' && query && !exact ? findSimilarTag(query, api.tags) : null
+
+  const run = async (tag) => {
+    setBusy(true); setMsg(null)
+    const res = mode === 'remove' ? await api.bulkRemove(entity, [...idSet], tag.id) : await api.bulkAdd(entity, [...idSet], tag.id)
+    setBusy(false)
+    if (res?.error) { setMsg({ error: true, text: res.error }); return }
+    setMsg({ text: `${mode === 'remove' ? 'Removed' : 'Added'} “${tag.name}” ${mode === 'remove' ? 'from' : 'to'} ${count} ${noun}.` })
+    setMode(null); setQ('')
+  }
+  const createAndAdd = async () => {
+    setBusy(true)
+    const t = await api.create(query)
+    setBusy(false)
+    if (!t || t.error) { setMsg({ error: true, text: t?.error || 'Could not create tag' }); return }
+    await run(t)
+  }
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-xl" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="bg-fp-card border border-fp-border rounded-xl shadow-2xl px-4 py-3 flex flex-wrap items-center gap-3" ref={boxRef}>
+        <span className="text-fp-text text-sm font-semibold">{count} selected</span>
+        <div className="relative">
+          <button type="button" disabled={busy} onClick={() => { setMode(mode === 'add' ? null : 'add'); setQ('') }}
+            className="text-sm px-3 py-1.5 rounded-lg bg-fp-brand text-white font-semibold disabled:opacity-50">+ Add tag</button>
+          <button type="button" disabled={busy} onClick={() => { setMode(mode === 'remove' ? null : 'remove'); setQ('') }}
+            className="ml-2 text-sm px-3 py-1.5 rounded-lg bg-fp-inset text-fp-text font-semibold disabled:opacity-50">Remove tag</button>
+          {mode && (
+            <div className="absolute bottom-full mb-2 left-0 w-64 bg-fp-card border border-fp-border rounded-lg shadow-xl p-2">
+              <input autoFocus value={q} onChange={e => setQ(e.target.value)} maxLength={40}
+                onKeyDown={e => { if (e.key === 'Escape') setMode(null); if (e.key === 'Enter' && list.length === 1) run(list[0]) }}
+                placeholder={mode === 'add' ? (api.canCreate ? 'Find or create a tag…' : 'Find a tag…') : 'Find a tag to remove…'}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fp-brand" />
+              <div className="mt-1.5 max-h-56 overflow-y-auto space-y-0.5">
+                {similar && (
+                  <button type="button" onClick={() => run(similar)} className="w-full text-left px-2 py-1.5 rounded-md bg-fp-brand/10 hover:bg-fp-brand/20 text-xs text-fp-text flex items-center gap-2">
+                    <span className="text-fp-muted">Did you mean</span> <TagChip tag={similar} />
+                  </button>
+                )}
+                {list.map(t => (
+                  <button key={t.id} type="button" onClick={() => run(t)} disabled={busy} className="w-full text-left px-2 py-1 rounded-md hover:bg-fp-hover flex items-center"><TagChip tag={t} /></button>
+                ))}
+                {mode === 'add' && query && !exact && api.canCreate && (
+                  <button type="button" onClick={createAndAdd} disabled={busy} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-fp-hover text-xs text-fp-muted">
+                    Create <span className="text-fp-text font-semibold">“{query}”</span>{similar ? ' anyway' : ''} and add
+                  </button>
+                )}
+                {!list.length && !(mode === 'add' && query) && <p className="px-2 py-1.5 text-xs text-fp-muted">{mode === 'remove' ? 'None of the selected have tags.' : 'No tags yet. Type to create one.'}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+        <button type="button" onClick={onClear} className="ml-auto text-sm text-fp-muted hover:text-fp-text">Done</button>
+        {msg && <p className={`basis-full text-xs ${msg.error ? 'text-red-400' : 'text-green-500'}`}>{msg.text}</p>}
+      </div>
     </div>
   )
 }
