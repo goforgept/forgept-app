@@ -1348,6 +1348,24 @@ Deno.serve(async (req) => {
     }, { headers: { ...CORS, "Cache-Control": "no-cache" } })
   }
 
+  // ─── OAuth client check for the consent page — no auth ───────────────────
+  // Returns the app's name and whether redirect_uri is one it registered.
+  // Runs server-side so it doesn't depend on oauth_clients RLS; never returns the registered list.
+  if (req.method === "GET" && urlPath.includes("/oauth/client")) {
+    const q = new URL(req.url).searchParams
+    const clientId = q.get("client_id") || ""
+    const redirectUri = q.get("redirect_uri") || ""
+    const { data: row } = await sb.from("oauth_clients").select("client_name, redirect_uris").eq("client_id", clientId).maybeSingle()
+    let registered: string[] = []
+    const raw = row?.redirect_uris
+    if (Array.isArray(raw)) registered = raw
+    else if (typeof raw === "string") { try { const j = JSON.parse(raw); registered = Array.isArray(j) ? j : [raw] } catch { registered = [raw] } }
+    // Loopback apps (local tools) may switch between localhost and 127.0.0.1 (RFC 8252 §7.3)
+    const loop = (u: string) => { try { const x = new URL(u); if (["localhost", "127.0.0.1", "[::1]"].includes(x.hostname)) x.hostname = "localhost"; return x.toString() } catch { return u } }
+    const ok = !!row && registered.some(r => r === redirectUri || loop(r) === loop(redirectUri))
+    return Response.json({ found: !!row, client_name: row?.client_name || null, redirect_ok: ok }, { headers: { ...CORS, "Cache-Control": "no-store" } })
+  }
+
   // ─── OAuth dynamic client registration (RFC 7591) — no auth ──────────────
   if (req.method === "POST" && urlPath.includes("/oauth/register")) {
     let body: any

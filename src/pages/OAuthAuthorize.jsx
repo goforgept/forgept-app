@@ -25,15 +25,16 @@ export default function OAuthAuthorize() {
   // Only send codes back to a redirect address the app registered with.
   // Without this, a fake app could get a user to approve and receive their access.
   const loadClientName = async () => {
-    const { data } = await supabase
-      .from('oauth_clients')
-      .select('client_name, redirect_uris')
-      .eq('client_id', clientId)
-      .maybeSingle()
-    setClientName(data?.client_name || 'An AI assistant')
-    const registered = Array.isArray(data?.redirect_uris) ? data.redirect_uris : []
     const methodOk = !codeChallengeMethod || codeChallengeMethod === 'S256'
-    setClientCheck(data && methodOk && registered.includes(redirectUri) ? 'ok' : 'bad')
+    try {
+      const qs = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri })
+      const res = await fetch(`/api/mcp/oauth/client?${qs}`)
+      const data = await res.json()
+      setClientName(data?.client_name || 'An AI assistant')
+      setClientCheck(res.ok && data?.redirect_ok && methodOk ? 'ok' : 'bad')
+    } catch {
+      setClientCheck('bad')
+    }
   }
 
   const handleApprove = async () => {
