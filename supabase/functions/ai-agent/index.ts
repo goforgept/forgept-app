@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
 import { checkAndIncrementAIUsage } from "../_shared/ai-usage.ts"
+import { normalizeLinkedIn, updateContact, listTags, tagRecord, tagNamesFor, clientIdsWithTag, proposalIdsWithTag, TAG_TOOL_SCHEMAS } from "../_shared/crm.ts"
 
 const TOOLS = [
   {
@@ -21,21 +22,24 @@ const TOOLS = [
         website: { type: "string", description: "Website URL" },
         industry: { type: "string", description: "Industry or vertical" },
         notes: { type: "string", description: "Internal notes about the client" },
+        linkedin_url: { type: "string", description: "Company LinkedIn page, e.g. linkedin.com/company/acme" },
       },
       required: ["company"],
     },
   },
   {
     name: "search_clients",
-    description: "Search for clients by name, company, or email",
+    description: "Search for clients by name, company, or email, optionally limited to clients with a tag",
     input_schema: {
       type: "object",
       properties: {
         query: { type: "string", description: "Search term" },
+        tag: { type: "string", description: "Only clients with this tag (tag name, case-insensitive)" },
       },
-      required: ["query"],
+      required: [],
     },
   },
+  ...Object.entries(TAG_TOOL_SCHEMAS).map(([name, t]) => ({ name, description: t.description, input_schema: t.schema })),
   {
     name: "create_service_ticket",
     description: "Create a new service ticket",
@@ -100,6 +104,7 @@ const TOOLS = [
         phone: { type: "string", description: "Contact phone number" },
         title: { type: "string", description: "Job title or role" },
         is_primary: { type: "boolean", description: "Set as primary contact (default false)" },
+        linkedin_url: { type: "string", description: "Person's LinkedIn profile, e.g. linkedin.com/in/jane-smith" },
       },
       required: ["company", "full_name"],
     },
@@ -120,6 +125,7 @@ const TOOLS = [
         website: { type: "string", description: "New website URL" },
         industry: { type: "string", description: "New industry" },
         notes: { type: "string", description: "New internal notes (replaces existing notes)" },
+        linkedin_url: { type: "string", description: "Company LinkedIn page; empty string clears it" },
       },
       required: ["company"],
     },
@@ -132,6 +138,7 @@ const TOOLS = [
       properties: {
         query: { type: "string", description: "Search term — company name, proposal name, or rep name" },
         status: { type: "string", description: "Filter by status: Draft, Sent, Won, Lost, etc." },
+        tag: { type: "string", description: "Only proposals with this tag, on the proposal itself or on its client" },
       },
       required: [],
     },
@@ -345,6 +352,9 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   create_invoice:         { area: 'invoices',       write: true },
   schedule_meeting:       { area: 'clients',        write: true },
   get_reports:            { area: 'reports' },
+  list_tags:              { area: 'clients' },
+  update_contact:         { area: 'clients',        write: true },
+  // tag_record: checked per entity in its case
 }
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string, perms: Record<string, string>) {
@@ -357,6 +367,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
   }
   switch (name) {
     case "create_client": {
+      const li = normalizeLinkedIn(input.linkedin_url)
+      if ("error" in li) return { error: li.error }
       const { data, error } = await supabase.from("clients").insert({
         org_id: orgId,
         company: input.company,
@@ -370,19 +382,42 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         website: input.website || null,
         industry: input.industry || null,
         notes: input.notes || null,
+        linkedin_url: li.url,
       }).select("id, company").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, company: data.company, action: "created_client" }
     }
 
     case "search_clients": {
-      const q = `%${input.query}%`
-      const { data } = await supabase.from("clients")
-        .select("id, company, client_name, email, phone")
+      let query = supabase.from("clients")
+        .select("id, company, client_name, email, phone, client_tags(tags(name))")
         .eq("org_id", orgId)
-        .or(`company.ilike.${q},client_name.ilike.${q},email.ilike.${q}`)
-        .limit(5)
-      return { results: data || [] }
+      if (input.tag) {
+        const ids = await clientIdsWithTag(supabase, orgId, input.tag)
+        if (ids === null) return { results: [], note: `No tag named "${input.tag}". Use list_tags to see tags.` }
+        if (!ids.length) return { results: [] }
+        query = query.in("id", ids)
+      }
+      if (input.query) {
+        const q = `%${input.query}%`
+        query = query.or(`company.ilike.${q},client_name.ilike.${q},email.ilike.${q}`)
+      }
+      const { data } = await query.limit(input.tag ? 100 : 5)
+      return { results: (data || []).map((c: any) => ({ ...c, tags: (c.client_tags || []).map((l: any) => l.tags?.name).filter(Boolean), client_tags: undefined })) }
+    }
+
+    case "list_tags": {
+      return await listTags(supabase, orgId)
+    }
+
+    case "tag_record": {
+      const area = input.entity === "proposal" ? "proposals" : "clients"
+      if ((perms[area] || "write") !== "write") return { error: `You don't have permission to edit ${area}.` }
+      return await tagRecord(supabase, orgId, userId, input)
+    }
+
+    case "update_contact": {
+      return await updateContact(supabase, orgId, input)
     }
 
     case "create_service_ticket": {
@@ -434,6 +469,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         .select("id, company").eq("org_id", orgId)
         .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
       if (!client) return { error: `No client account found matching "${input.company}". Create the company first with create_client.` }
+      const li = normalizeLinkedIn(input.linkedin_url)
+      if ("error" in li) return { error: li.error }
       const { data, error } = await supabase.from("client_contacts").insert({
         org_id: orgId,
         client_id: client.id,
@@ -443,6 +480,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         title: input.title || null,
         is_primary: input.is_primary || false,
         notes: "",
+        linkedin_url: li.url,
       }).select("id, full_name").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, full_name: data.full_name, company: client.company, action: "created_contact" }
@@ -623,6 +661,11 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       if (input.website  !== undefined) updates.website  = input.website
       if (input.industry !== undefined) updates.industry = input.industry
       if (input.notes    !== undefined) updates.notes    = input.notes
+      if (input.linkedin_url !== undefined) {
+        const li = normalizeLinkedIn(input.linkedin_url)
+        if ("error" in li) return { error: li.error }
+        updates.linkedin_url = li.url
+      }
       if (Object.keys(updates).length === 0) return { error: "No fields provided to update." }
       const { error } = await supabase.from("clients").update(updates).eq("id", client.id)
       if (error) return { error: error.message }
@@ -640,13 +683,19 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         const q = `%${input.query}%`
         query = query.or(`proposal_name.ilike.${q},company.ilike.${q},client_name.ilike.${q}`)
       }
+      if (input.tag) {
+        const ids = await proposalIdsWithTag(supabase, orgId, input.tag)
+        if (ids === null) return { results: [], note: `No tag named "${input.tag}". Use list_tags to see tags.` }
+        if (!ids.length) return { results: [] }
+        query = query.in("id", ids)
+      }
       const { data } = await query
       return { results: data || [] }
     }
 
     case "get_client_overview": {
       const { data: client } = await supabase.from("clients")
-        .select("id, company, client_name, email, phone, address, city, state, website, notes")
+        .select("id, company, client_name, email, phone, address, city, state, website, linkedin_url, notes")
         .eq("org_id", orgId)
         .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
       if (!client) return { error: `No client found matching "${input.company}".` }
@@ -664,7 +713,12 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .eq("org_id", orgId).eq("client_id", client.id)
           .neq("status", "completed").limit(5),
       ])
-      return { client, open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
+      const [{ data: contacts }, clientTags] = await Promise.all([
+        supabase.from("client_contacts").select("full_name, title, email, phone, linkedin_url, is_primary")
+          .eq("org_id", orgId).eq("client_id", client.id).order("is_primary", { ascending: false }).limit(25),
+        tagNamesFor(supabase, "client", client.id),
+      ])
+      return { client: { ...client, tags: clientTags }, contacts: contacts || [], open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
     }
 
     case "search_products": {
@@ -1043,7 +1097,7 @@ ${helpContext}
 Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
       : `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
 
-You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, proposals, and invoices, view pipeline summaries, look up inventory stock levels, search the product library, schedule meetings, pull revenue and win-rate reports, update a proposal's stage or close date, and mark proposals as Won or Lost. You can also answer questions about how ForgePt features work.
+You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, proposals, and invoices, view pipeline summaries, look up inventory stock levels, search the product library, schedule meetings, pull revenue and win-rate reports, update a proposal's stage or close date, mark proposals as Won or Lost, and tag clients, contacts and proposals (tags are shared labels like "Tier 1" or "Hospital"; a proposal also carries its client's tags). You can also answer questions about how ForgePt features work.
 - When a user asks about inventory, stock levels, what's in stock, or what parts are on hand — always call get_inventory. Never say inventory is empty without calling it first.
 ${helpContext}
 
@@ -1055,6 +1109,7 @@ Guidelines:
 - IMPORTANT: When adding a contact person to an existing company, always use create_contact (not create_client). create_client creates a new company account. create_contact adds a person to an existing company's Contacts tab.
 - When creating a new client, use create_client for the company (with address, website, industry, notes), then immediately follow up with create_contact to add the primary contact person (name, title, email, phone) — do both in sequence without asking.
 - NEVER use create_client to change the main POC on an existing client — that creates a duplicate. To change the main POC, use update_client_poc. Always search the client first, tell the user the current POC ("Pinnacle Group's main POC is currently Marcus Delgado — replace with Sarah Chen?"), and only call update_client_poc after the user confirms.
+- Tags: call list_tags before creating a new tag and reuse an existing name when one fits ("Hospital", not "Hospitals"). Use the tag filter on search_clients / search_proposals for questions like "my Tier 1 deals".
 - Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
 
     // Agentic loop — keep calling Claude until it stops using tools
