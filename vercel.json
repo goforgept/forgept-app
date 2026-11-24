@@ -1,15 +1,42 @@
 {
   "rewrites": [
-    { "source": "/api/mcp/:path*", "destination": "https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/.well-known/oauth-protected-resource/api/mcp",
+      "destination": "https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server/api/mcp",
+      "destination": "/.well-known/oauth-authorization-server"
+    },
+    {
+      "source": "/api/mcp/:path*",
+      "destination": "https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/mcp-server/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
-      "source": "/.well-known/oauth-authorization-server",
+      "source": "/.well-known/oauth-authorization-server(.*)",
       "headers": [
-        { "key": "Content-Type", "value": "application/json" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Cache-Control", "value": "no-cache" }
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
       ]
     },
     {

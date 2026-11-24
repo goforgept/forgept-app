@@ -14,6 +14,7 @@ export default function OAuthAuthorize() {
   const codeChallengeMethod = searchParams.get('code_challenge_method')
 
   const [clientName, setClientName] = useState('')
+  const [clientCheck, setClientCheck] = useState('pending') // 'pending' | 'ok' | 'bad'
   const [approving, setApproving]   = useState(false)
   const [err, setErr]               = useState(null)
 
@@ -21,16 +22,22 @@ export default function OAuthAuthorize() {
     if (!loading && session && clientId) loadClientName()
   }, [loading, session, clientId])
 
+  // Only send codes back to a redirect address the app registered with.
+  // Without this, a fake app could get a user to approve and receive their access.
   const loadClientName = async () => {
     const { data } = await supabase
       .from('oauth_clients')
-      .select('client_name')
+      .select('client_name, redirect_uris')
       .eq('client_id', clientId)
       .maybeSingle()
     setClientName(data?.client_name || 'An AI assistant')
+    const registered = Array.isArray(data?.redirect_uris) ? data.redirect_uris : []
+    const methodOk = !codeChallengeMethod || codeChallengeMethod === 'S256'
+    setClientCheck(data && methodOk && registered.includes(redirectUri) ? 'ok' : 'bad')
   }
 
   const handleApprove = async () => {
+    if (clientCheck !== 'ok') return
     setApproving(true)
     setErr(null)
     const bytes = new Uint8Array(32)
@@ -60,6 +67,7 @@ export default function OAuthAuthorize() {
   }
 
   const handleDeny = () => {
+    if (clientCheck !== 'ok') { window.location.href = '/'; return }
     const dest = new URL(redirectUri)
     dest.searchParams.set('error', 'access_denied')
     if (state) dest.searchParams.set('state', state)
@@ -106,6 +114,28 @@ export default function OAuthAuthorize() {
     )
   }
 
+  if (clientCheck === 'pending') {
+    return (
+      <div className="min-h-screen bg-fp-inset flex items-center justify-center">
+        <p className="text-fp-muted text-sm">Loading...</p>
+      </div>
+    )
+  }
+
+  if (clientCheck === 'bad') {
+    return (
+      <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <p className="text-red-400 font-semibold mb-2">This connection request can't be verified.</p>
+          <p className="text-fp-muted text-sm">The app didn't register this return address with ForgePt. Remove the connection in your AI app and add it again. If you didn't start this, close this page.</p>
+        </div>
+      </div>
+    )
+  }
+
+  let returnHost = ''
+  try { returnHost = new URL(redirectUri).host } catch { /* validated above */ }
+
   const capabilities = [
     'Read and search your clients and proposals',
     'Create and update proposals on your behalf',
@@ -135,6 +165,7 @@ export default function OAuthAuthorize() {
           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1.5">Connecting as</p>
           <p className="text-fp-text font-semibold text-sm">{profile?.full_name || profile?.email}</p>
           <p className="text-fp-muted text-xs mt-0.5">{profile?.organizations?.name}</p>
+          {returnHost && <p className="text-fp-muted text-xs mt-2">You'll be sent back to <span className="text-fp-text font-semibold">{returnHost}</span></p>}
         </div>
 
         {/* Capabilities */}

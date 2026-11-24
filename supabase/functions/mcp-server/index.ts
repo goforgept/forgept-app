@@ -4,11 +4,19 @@ import { normalizeLinkedIn, updateContact, listTags, tagRecord, tagNamesFor, cli
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, mcp-session-id',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, content-type, mcp-session-id, mcp-protocol-version',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Expose-Headers': 'WWW-Authenticate, Mcp-Session-Id',
 }
 
 const MCP_BASE_URL = 'https://app.goforgept.com/api/mcp'
+// OAuth authorization server = the app root (matches public/.well-known/oauth-authorization-server)
+const AUTH_ISSUER = 'https://app.goforgept.com'
+// RFC 9728 protected-resource metadata, served via vercel.json rewrites
+const RESOURCE_METADATA_URL = 'https://app.goforgept.com/.well-known/oauth-protected-resource/api/mcp'
+// Protocol versions this server speaks (newest first)
+const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
+const WWW_AUTH = `Bearer realm="ForgePt MCP", scope="agent:mcp", resource_metadata="${RESOURCE_METADATA_URL}"`
 const APP_URL      = 'https://app.goforgept.com'
 
 async function sha256hex(str: string): Promise<string> {
@@ -1312,10 +1320,23 @@ Deno.serve(async (req) => {
   const urlPath = new URL(req.url).pathname
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)
 
+  // ─── Protected resource metadata (RFC 9728) — no auth ────────────────────
+  // Tells MCP clients which authorization server protects this endpoint.
+  if (req.method === "GET" && urlPath.includes("/.well-known/oauth-protected-resource")) {
+    return Response.json({
+      resource: MCP_BASE_URL,
+      authorization_servers: [AUTH_ISSUER],
+      scopes_supported: ["agent:mcp"],
+      bearer_methods_supported: ["header"],
+      resource_name: "ForgePt",
+      resource_documentation: "https://goforgept.com/ai.html",
+    }, { headers: { ...CORS, "Cache-Control": "no-cache" } })
+  }
+
   // ─── OAuth discovery (RFC 8414) — no auth ────────────────────────────────
   if (req.method === "GET" && urlPath.includes("/.well-known/oauth-authorization-server")) {
     return Response.json({
-      issuer: MCP_BASE_URL,
+      issuer: AUTH_ISSUER,
       authorization_endpoint: `${APP_URL}/oauth/authorize`,
       token_endpoint: `${MCP_BASE_URL}/oauth/token`,
       registration_endpoint: `${MCP_BASE_URL}/oauth/register`,
@@ -1375,6 +1396,10 @@ Deno.serve(async (req) => {
 
     if (!codeRow) return Response.json({ error: "invalid_grant", error_description: "Code not found or expired" }, { status: 400, headers: CORS })
     if (codeRow.client_id !== clientId) return Response.json({ error: "invalid_client" }, { status: 400, headers: CORS })
+    const redirectUri = params.get("redirect_uri")
+    if (codeRow.redirect_uri && redirectUri && redirectUri !== codeRow.redirect_uri) {
+      return Response.json({ error: "invalid_grant", error_description: "redirect_uri does not match" }, { status: 400, headers: CORS })
+    }
 
     // PKCE S256 verification
     const computedChallenge = await sha256base64url(codeVerifier)
@@ -1382,7 +1407,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: "invalid_grant", error_description: "PKCE verification failed" }, { status: 400, headers: CORS })
     }
 
-    // Create the API key
+    // Create the API key, named after the connecting app so it's recognizable in Settings
+    const { data: clientRow } = await sb.from("oauth_clients").select("client_name").eq("client_id", clientId).maybeSingle()
+    const appName = String(clientRow?.client_name || "AI assistant").slice(0, 60)
     const rawKey = generateApiKey()
     const keyHash = await sha256hex(rawKey)
     const keyPrefix = rawKey.slice(0, 12)
@@ -1390,7 +1417,7 @@ Deno.serve(async (req) => {
     const { error: keyErr } = await sb.from("api_keys").insert({
       org_id:     codeRow.org_id,
       user_id:    codeRow.user_id,
-      name:       "Claude (AI Agent)",
+      name:       `${appName} (MCP)`,
       key_prefix: keyPrefix,
       key_hash:   keyHash,
       scopes:     ["agent:mcp"],
@@ -1418,8 +1445,8 @@ Deno.serve(async (req) => {
         headers: {
           ...CORS,
           "Content-Type": "application/json",
-          "WWW-Authenticate": `Bearer realm="ForgePt MCP", scope="agent:mcp"`,
-          "Link": `<${MCP_BASE_URL}/.well-known/oauth-authorization-server>; rel="oauth-authorization-server"`,
+          "WWW-Authenticate": WWW_AUTH,
+          "Link": `<${AUTH_ISSUER}/.well-known/oauth-authorization-server>; rel="oauth-authorization-server"`,
         },
       }
     )
@@ -1434,10 +1461,15 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (!keyRow?.is_active) {
-    return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Invalid or revoked API key" } }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } })
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Invalid or revoked API key" } }), { status: 401, headers: { ...CORS, "Content-Type": "application/json", "WWW-Authenticate": WWW_AUTH } })
   }
   if (!keyRow.scopes?.includes("agent:mcp")) {
     return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32003, message: "Key does not have agent:mcp scope. Generate a new key with the AI Agent scope in ForgePt Settings." } }), { status: 403, headers: { ...CORS, "Content-Type": "application/json" } })
+  }
+
+  // Streamable HTTP: this server answers each POST directly and keeps no sessions or event stream
+  if (req.method === "GET" || req.method === "DELETE") {
+    return new Response(null, { status: 405, headers: { ...CORS, "Allow": "POST, OPTIONS" } })
   }
 
   const orgId: string  = keyRow.org_id
@@ -1462,12 +1494,18 @@ Deno.serve(async (req) => {
   }
 
   switch (method) {
-    case "initialize":
+    case "initialize": {
+      const requested = params?.protocolVersion
       return ok({
-        protocolVersion: "2024-11-05",
+        protocolVersion: PROTOCOL_VERSIONS.includes(requested) ? requested : PROTOCOL_VERSIONS[0],
         capabilities: { tools: {} },
-        serverInfo: { name: "ForgePt", version: "1.0.0" },
+        serverInfo: { name: "ForgePt", version: "1.1.0" },
+        instructions: "ForgePt is a CRM, proposal and field-service platform for security and low-voltage integrators. Search before creating clients to avoid duplicates. Use list_tags before creating new tags.",
       })
+    }
+
+    case "ping":
+      return ok({})
 
     case "tools/list":
       return ok({ tools: TOOLS })
