@@ -1303,6 +1303,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       deviceMap[key].qty += p.quantity || 1
     })
 
+    // Rack builder: enclosures + devices in U slots count as devices
+    const addDevice = (part, name, manufacturer, category, qty) => {
+      const key = part || `${manufacturer}|${name}`
+      if (!deviceMap[key]) deviceMap[key] = { part_number: part || '', name: name || '', manufacturer: manufacturer || '', category: category || '', qty: 0 }
+      deviceMap[key].qty += qty
+    }
+    rackList.filter(r => r.part_number).forEach(r => addDevice(r.part_number, r.model || r.name || 'Rack', r.manufacturer, 'Rack', 1))
+    rackItemsData.forEach(ri => {
+      const gp = ri.global_products
+      addDevice(ri.part_number || gp?.part_number, ri.label || gp?.name || ri.model, ri.manufacturer || gp?.manufacturer,
+        ri.category || gp?.category || 'Rack Equipment', ri.quantity || 1)
+    })
+
     Object.values(deviceMap).forEach(d => {
       rows.push([
         d.part_number,
@@ -1314,13 +1327,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       ])
     })
 
-    // Components
-    if (components.length > 0) {
+    // Components — device components plus rack accessories and rack-device modules (SFPs, PSUs)
+    const allComponents = [
+      ...components,
+      ...rackComponents.map(c => ({ ...c, name: c.name || c.component_type, notes: c.notes || '' })),
+      ...rackItemComponents.map(c => ({ ...c, name: c.name || c.component_type, notes: c.notes || '' })),
+    ]
+    if (allComponents.length > 0) {
       rows.push([])
       rows.push(['COMPONENTS & HARDWARE', '', '', '', '', '', ''])
       rows.push(['Type', 'Part Number', 'Name', 'Manufacturer', 'Qty', 'Notes', ''])
-      components.forEach(c => {
-        rows.push([c.component_type, c.part_number || '', c.name || '', c.manufacturer || '', c.quantity || 1, c.notes || '', ''])
+      allComponents.forEach(c => {
+        rows.push([c.component_type || '', c.part_number || '', c.name || '', c.manufacturer || '', c.quantity || 1, c.notes || '', ''])
       })
     }
 
