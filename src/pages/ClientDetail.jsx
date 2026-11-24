@@ -9,6 +9,7 @@ import ActivityTimeline from '../components/ActivityTimeline'
 import TaskList from '../components/TaskList'
 import { clientName } from '../utils/client'
 import { normalizeLinkedIn, LinkedInIcon } from '../lib/linkedin'
+import { useTags, TagEditor, TagList } from '../components/tags/tags'
 
 const INDUSTRIES = [
   'Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security',
@@ -68,6 +69,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [panelForm, setPanelForm] = useState(emptyContact)
   const [savingContact, setSavingContact] = useState(false)
   const [linkedinError, setLinkedinError] = useState(null)
+  const tagApi = useTags(['client', 'contact'])
   // Subscriptions
   const [subscriptions, setSubscriptions] = useState([])
   const [editingSub, setEditingSub] = useState(null)
@@ -735,6 +737,7 @@ const deleteMeeting = async (meetingId) => {
                   )}
                 </div>
                 {fullAddress && <p className="text-fp-muted text-sm mt-0.5">{fullAddress}</p>}
+                <div className="mt-2"><TagEditor api={tagApi} entity="client" id={id} canEdit={canWrite('clients')} /></div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1048,6 +1051,7 @@ const deleteMeeting = async (meetingId) => {
                           {contact.title && <p className="text-fp-muted text-xs">{contact.title}</p>}
                           {contact.location_id && (() => { const loc = locations.find(l => l.id === contact.location_id); return loc ? <span className="text-fp-muted text-xs">· {loc.site_name}</span> : null })()}
                         </div>
+                        {tagApi.tagsFor('contact', contact.id).length > 0 && <div className="mt-1"><TagList tags={tagApi.tagsFor('contact', contact.id)} max={4} /></div>}
                         {/* Mobile-only email/phone */}
                         <div className="md:hidden mt-1 space-y-0.5">
                           {contact.email && <p className="text-fp-muted text-xs truncate">{contact.email}</p>}
@@ -1514,6 +1518,12 @@ const deleteMeeting = async (meetingId) => {
                   <a href={normalizeLinkedIn(panelForm.linkedin_url).url} target="_blank" rel="noopener noreferrer"
                     className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">View profile →</a>
                 )}
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Tags</label>
+                {contactPanel === 'new'
+                  ? <p className="text-fp-muted text-xs">Save the contact first, then add tags.</p>
+                  : <TagEditor api={tagApi} entity="contact" id={contactPanel.id} canEdit={canWrite('clients')} />}
               </div>
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Location</label>

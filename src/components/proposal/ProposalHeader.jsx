@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTags, TagEditor } from '../tags/tags'
 
 const STATUS_FALLBACK = { Won: 'Won', Lost: 'Lost', Sent: 'Proposal Sent', Draft: 'Lead' }
 
@@ -35,6 +36,7 @@ export default function ProposalHeader({
   const [dealAmountDirty, setDealAmountDirty] = useState(false)
   const [dealAmountFocused, setDealAmountFocused] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const tagApi = useTags(['client', 'proposal'])
   const menuRef = useRef(null)
 
   useEffect(() => { setQuoteDraft(proposal?.quote_number    ?? '') }, [proposal?.quote_number])
@@ -147,6 +149,12 @@ export default function ProposalHeader({
               {clientAddress && <span className="text-fp-muted text-xs">{clientAddress}</span>}
               {locationName && <span className="text-fp-muted text-xs">📍 {locationName}</span>}
             </div>
+            {proposal?.id && (
+              <div className="px-1 mt-2">
+                <TagEditor api={tagApi} entity="proposal" id={proposal.id} canEdit={canEdit}
+                  inherited={proposal.client_id ? tagApi.tagsFor('client', proposal.client_id) : []} />
+              </div>
+            )}
           </div>
 
           {/* Collaborators */}

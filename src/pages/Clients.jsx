@@ -6,6 +6,7 @@ import { clientName } from '../utils/client'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { usePermissions } from '../hooks/usePermissions'
 import { normalizeLinkedIn } from '../lib/linkedin'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -59,6 +60,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [filterIndustry, setFilterIndustry] = useState('')
   const [filterType, setFilterType] = useState('all') // 'all' | 'commercial' | 'residential'
   const [showArchived, setShowArchived] = useState(false)
+  const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER)
+  const tagApi = useTags(['client'])
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
@@ -190,6 +193,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       email: primary.email || '',
       phone: primary.phone || '',
       isArchived: contacts.every(c => !!c.archived_at),
+      tags: [...new Map(contacts.flatMap(c => tagApi.tagsFor('client', c.id)).map(t => [t.id, t])).values()],
     }
   })
 
@@ -207,7 +211,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
         c.contacts.some(x => (x.last_name || '').toLowerCase().includes(q)) ||
         c.contacts.some(x => (x.email || '').toLowerCase().includes(q))
       const matchIndustry = !filterIndustry || c.industry === filterIndustry
-      return matchSearch && matchIndustry
+      const matchTags = matchTagFilter(c.tags.map(t => t.id), tagFilter)
+      return matchSearch && matchIndustry && matchTags
     })
     .map(c => {
       const q = search.toLowerCase()
@@ -289,6 +294,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
             <option value="">All Industries</option>
             {industries.map(i => <option key={i} value={i}>{i}</option>)}
           </select>
+          <TagFilter tags={tagApi.tags} value={tagFilter} onChange={setTagFilter} />
         </div>
 
         {/* Cards grid */}
@@ -301,7 +307,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(({ company, client_type, contacts, visibleContacts, navigateTo, primary, industry, location, email, phone, isArchived }) => {
+            {filtered.map(({ company, client_type, contacts, visibleContacts, navigateTo, primary, industry, location, email, phone, isArchived, tags }) => {
               const initials = company.slice(0, 2).toUpperCase()
               const badgeClass = industryColors[industry] || industryColors['Other']
               const displayPrimary = visibleContacts[0] || primary
@@ -348,6 +354,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                       </span>
                     )}
                   </div>
+
+                  {tags.length > 0 && <div className="-mt-2 mb-3"><TagList tags={tags} max={5} /></div>}
 
                   {/* Contact details */}
                   <div className="space-y-1.5">

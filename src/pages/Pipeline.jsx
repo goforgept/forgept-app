@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import PipelineStagesModal from '../components/pipeline/PipelineStagesModal'
 import { usePermissions } from '../hooks/usePermissions'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
 
 const DEFAULT_STAGES = [
   { name: 'Lead',                  color: '#8A9AB0', probability: 10,  definition: 'Potential opportunity identified' },
@@ -29,6 +30,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [search, setSearch] = useState('')
   const [dateRange, setDateRange] = useState(0)
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER)
+  const tagApi = useTags(['client', 'proposal'])
   const navigate = useNavigate()
   const { canWrite, scope } = usePermissions()
 
@@ -87,9 +90,13 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
 
   const dateThreshold = dateRange === 0 ? null : new Date(Date.now() - dateRange * 24 * 60 * 60 * 1000).toISOString()
 
-  const filteredProposals = dateThreshold
+  // A deal's tags = its own tags + its client's tags
+  const dealTagIds = (p) => [...(tagApi.links.proposal[p.id] || []), ...(p.client_id ? (tagApi.links.client[p.client_id] || []) : [])]
+
+  const filteredProposals = (dateThreshold
     ? proposals.filter(p => p.created_at >= dateThreshold)
     : proposals
+  ).filter(p => matchTagFilter(dealTagIds(p), tagFilter))
 
   const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]))
 
@@ -233,6 +240,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               <option value="commercial">Commercial</option>
               <option value="residential">Residential</option>
             </select>
+            <TagFilter tags={tagApi.tags} value={tagFilter} onChange={setTagFilter} />
             <input
               type="text"
               placeholder="Search deals..."
@@ -311,6 +319,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                         {proposal.proposal_name}
                       </p>
                       <p className="text-fp-muted text-xs mt-1">{proposal.company}</p>
+                      {(tagApi.links.proposal[proposal.id]?.length || (proposal.client_id && tagApi.links.client[proposal.client_id]?.length)) ? (
+                        <div className="mt-1.5">
+                          <TagList tags={tagApi.tagsFor('proposal', proposal.id)} inherited={proposal.client_id ? tagApi.tagsFor('client', proposal.client_id) : []} max={3} />
+                        </div>
+                      ) : null}
                       <div className="flex justify-between items-center mt-2">
                         <div>
                           <span className="text-fp-text text-sm font-bold">

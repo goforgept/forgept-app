@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { usePermissions } from '../hooks/usePermissions'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
 
 export default function Proposals({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
@@ -16,6 +17,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [closingSoon, setClosingSoon] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER)
+  const tagApi = useTags(['client', 'proposal'])
   const [dateRange, setDateRange] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -137,6 +140,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       if (clientTypeFilter === 'all') return true
       return (p._clientType || 'commercial') === clientTypeFilter
     })
+    .filter(p => matchTagFilter([...(tagApi.links.proposal[p.id] || []), ...(p.client_id ? (tagApi.links.client[p.client_id] || []) : [])], tagFilter))
     .filter(p => {
       if (!search) return true
       const s = search.toLowerCase()
@@ -255,6 +259,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
               <option value="close_date">Close Date ↑</option>
               <option value="value">Highest Value</option>
             </select>
+            <TagFilter tags={tagApi.tags} value={tagFilter} onChange={setTagFilter} />
           </div>
           {!showArchived && (
             <div className="flex gap-2">
@@ -359,6 +364,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   </div>
                   <p className="text-fp-muted text-sm">{proposal.company} · {proposal.rep_name}</p>
                   <p className="text-fp-muted text-xs">{proposal.rep_email}</p>
+                  <div className="mt-1"><TagList tags={tagApi.tagsFor('proposal', proposal.id)} inherited={proposal.client_id ? tagApi.tagsFor('client', proposal.client_id) : []} max={4} /></div>
                 </div>
                 <div className="flex items-center gap-4">
                   {(proposal.subtotal_value ?? proposal.proposal_value) > 0 && (

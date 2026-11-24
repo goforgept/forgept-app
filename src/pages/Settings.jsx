@@ -17,6 +17,7 @@ import TeamSettingsTab from '../components/settings/TeamSettingsTab'
 import ApiTab from '../components/settings/ApiTab'
 import AiAgentTab from '../components/settings/AiAgentTab'
 import RegionsTab from '../components/settings/RegionsTab'
+import TagsTab from '../components/settings/TagsTab'
 import GlobalProductsImport from '../components/GlobalProductsImport'
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician, isDevTeam = false }) {
@@ -587,7 +588,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'billing',      label: 'Billing' },
       ]
     }] : []),
-    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
+    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'tags', label: 'Tags' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
     ...(isDevTeam && !isAdmin ? [{
       label: 'Developer',
       items: [
@@ -738,6 +739,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
           {activeTab === 'designer' && isAdmin && <DesignerTab />}
 
+          {activeTab === 'tags' && isAdmin && <TagsTab />}
           {activeTab === 'regions' && isAdmin && <RegionsTab regionsEnabled={regionsEnabled} setRegionsEnabled={setRegionsEnabled} />}
           {activeTab === 'api' && (isAdmin || isDevTeam) && <ApiTab featureApi={featureApi} />}
           {activeTab === 'ai-agent' && <AiAgentTab featureApi={featureApi} />}

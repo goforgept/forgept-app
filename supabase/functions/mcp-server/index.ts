@@ -32,8 +32,32 @@ function generateApiKey(): string {
 const TOOLS = [
   {
     name: "search_clients",
-    description: "Search for clients by name, company, or email",
-    inputSchema: { type: "object", properties: { query: { type: "string", description: "Search term" } }, required: ["query"] },
+    description: "Search for clients by name, company, or email, optionally limited to clients with a tag",
+    inputSchema: { type: "object", properties: {
+      query: { type: "string", description: "Search term" },
+      tag: { type: "string", description: "Only clients with this tag (tag name, case-insensitive)" },
+    }, required: [] },
+  },
+  {
+    name: "list_tags",
+    description: "List the organization's tags with how many clients, contacts and proposals use each",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "tag_record",
+    description: "Add or remove tags on a client, contact or proposal. Tags are shared across the org; adding a tag that doesn't exist creates it (unless the org restricts tag creation to admins). Prefer existing tag names from list_tags.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: ["client", "contact", "proposal"] },
+        company: { type: "string", description: "Client company (required for client and contact)" },
+        full_name: { type: "string", description: "Contact name (for entity=contact)" },
+        proposal_name: { type: "string", description: "Proposal name or quote number (for entity=proposal)" },
+        add: { type: "array", items: { type: "string" }, description: "Tag names to add" },
+        remove: { type: "array", items: { type: "string" }, description: "Tag names to remove" },
+      },
+      required: ["entity"],
+    },
   },
   {
     name: "get_client_overview",
@@ -112,6 +136,7 @@ const TOOLS = [
         status: { type: "string", description: "Filter by proposal status: Draft, Sent, Won, Lost" },
         stage: { type: "string", description: "Filter by pipeline stage name, e.g. Lead, Qualified, Proposal Sent" },
         include_all: { type: "boolean", description: "Include Won, Lost, and expired proposals (default false — only open pipeline)" },
+        tag: { type: "string", description: "Only proposals with this tag, on the proposal itself or on its client" },
       },
       required: [],
     },
@@ -470,19 +495,133 @@ function normalizeLinkedIn(input: unknown): { url: string | null } | { error: st
   return { url: `https://www.linkedin.com/${m[1].toLowerCase()}/${m[2]}` }
 }
 
+// ─── Tags ────────────────────────────────────────────────────────────────────
+
+const TAG_COLORS = ["slate", "red", "orange", "amber", "green", "teal", "blue", "indigo", "purple", "pink"]
+const TAG_LINK: Record<string, { table: string; col: string }> = {
+  client: { table: "client_tags", col: "client_id" },
+  contact: { table: "contact_tags", col: "contact_id" },
+  proposal: { table: "proposal_tags", col: "proposal_id" },
+}
+const tagKey = (s: string) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase()
+
+async function findTag(supabase: any, orgId: string, name: string) {
+  const { data } = await supabase.from("tags").select("id, name").eq("org_id", orgId)
+  return (data || []).find((t: any) => tagKey(t.name) === tagKey(name)) || null
+}
+
+async function resolveTags(supabase: any, orgId: string, userId: string | null, names: string[], create: boolean) {
+  const { data: all } = await supabase.from("tags").select("id, name").eq("org_id", orgId)
+  const tags = [...(all || [])]
+  const ids: string[] = [], created: string[] = [], missing: string[] = []
+  let canCreate: boolean | null = null
+  for (const raw of names || []) {
+    const name = String(raw || "").trim().replace(/\s+/g, " ").slice(0, 40)
+    if (!name) continue
+    const hit = tags.find((t: any) => tagKey(t.name) === tagKey(name))
+    if (hit) { ids.push(hit.id); continue }
+    if (!create) { missing.push(name); continue }
+    if (canCreate === null) {
+      const [{ data: org }, { data: prof }] = await Promise.all([
+        supabase.from("organizations").select("tags_admin_only").eq("id", orgId).maybeSingle(),
+        userId ? supabase.from("profiles").select("org_role, role").eq("id", userId).maybeSingle() : Promise.resolve({ data: null }),
+      ])
+      canCreate = !org?.tags_admin_only || prof?.org_role === "admin" || prof?.role === "admin"
+    }
+    if (!canCreate) { missing.push(name); continue }
+    const { data: row, error } = await supabase.from("tags")
+      .insert({ org_id: orgId, name, color: TAG_COLORS[tags.length % TAG_COLORS.length], created_by: userId })
+      .select("id, name").single()
+    if (error || !row) { missing.push(name); continue }
+    tags.push(row); ids.push(row.id); created.push(row.name)
+  }
+  return { ids, created, missing }
+}
+
+async function tagNamesFor(supabase: any, entity: string, id: string): Promise<string[]> {
+  const { table, col } = TAG_LINK[entity]
+  const { data } = await supabase.from(table).select("tags(name)").eq(col, id)
+  return (data || []).map((r: any) => r.tags?.name).filter(Boolean).sort()
+}
+
 // ─── Tool execution ───────────────────────────────────────────────────────────
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string | null): Promise<any> {
   switch (name) {
 
     case "search_clients": {
-      const q = `%${input.query}%`
-      const { data } = await supabase.from("clients")
-        .select("id, company, client_name, email, phone")
+      let query = supabase.from("clients")
+        .select("id, company, client_name, email, phone, client_tags(tags(name))")
         .eq("org_id", orgId)
-        .or(`company.ilike.${q},client_name.ilike.${q},email.ilike.${q}`)
-        .limit(5)
-      return { results: data || [] }
+      if (input.tag) {
+        const tag = await findTag(supabase, orgId, input.tag)
+        if (!tag) return { results: [], note: `No tag named "${input.tag}". Use list_tags to see tags.` }
+        const { data: links } = await supabase.from("client_tags").select("client_id").eq("tag_id", tag.id)
+        const ids = (links || []).map((l: any) => l.client_id)
+        if (!ids.length) return { results: [] }
+        query = query.in("id", ids)
+      }
+      if (input.query) {
+        const q = `%${input.query}%`
+        query = query.or(`company.ilike.${q},client_name.ilike.${q},email.ilike.${q}`)
+      }
+      const { data } = await query.limit(input.tag ? 100 : 5)
+      return { results: (data || []).map((c: any) => ({ ...c, tags: (c.client_tags || []).map((l: any) => l.tags?.name).filter(Boolean), client_tags: undefined })) }
+    }
+
+    case "list_tags": {
+      const { data: tags } = await supabase.from("tags").select("id, name, color").eq("org_id", orgId).order("name")
+      const count = async (table: string) => {
+        const { data } = await supabase.from(table).select("tag_id").eq("org_id", orgId)
+        const m: Record<string, number> = {}
+        for (const r of data || []) m[r.tag_id] = (m[r.tag_id] || 0) + 1
+        return m
+      }
+      const [cl, co, pr] = await Promise.all([count("client_tags"), count("contact_tags"), count("proposal_tags")])
+      return { tags: (tags || []).map((t: any) => ({ name: t.name, color: t.color, clients: cl[t.id] || 0, contacts: co[t.id] || 0, proposals: pr[t.id] || 0 })) }
+    }
+
+    case "tag_record": {
+      const entity = input.entity
+      if (!TAG_LINK[entity]) return { error: "entity must be client, contact or proposal" }
+      let recordId: string | null = null, label = ""
+      if (entity === "proposal") {
+        if (!input.proposal_name) return { error: "proposal_name is required for proposals" }
+        const q = `%${input.proposal_name}%`
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
+          .eq("org_id", orgId).eq("is_current_revision", true)
+          .or(`proposal_name.ilike.${q},quote_number.ilike.${q}`).limit(2)
+        if (!data?.length) return { error: `No proposal matching "${input.proposal_name}".` }
+        if (data.length > 1) return { error: `More than one proposal matches "${input.proposal_name}": ${data.map((p: any) => p.proposal_name).join(", ")}. Be more specific.` }
+        recordId = data[0].id; label = `${data[0].proposal_name} (${data[0].company || ""})`
+      } else {
+        if (!input.company) return { error: "company is required" }
+        const { data: client } = await supabase.from("clients").select("id, company")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+        if (!client) return { error: `No client found matching "${input.company}".` }
+        if (entity === "client") { recordId = client.id; label = client.company }
+        else {
+          if (!input.full_name) return { error: "full_name is required for contacts" }
+          const { data: m } = await supabase.from("client_contacts").select("id, full_name")
+            .eq("org_id", orgId).eq("client_id", client.id).ilike("full_name", `%${input.full_name}%`).limit(2)
+          if (!m?.length) return { error: `No contact matching "${input.full_name}" at ${client.company}.` }
+          if (m.length > 1) return { error: `More than one contact matches "${input.full_name}": ${m.map((x: any) => x.full_name).join(", ")}.` }
+          recordId = m[0].id; label = `${m[0].full_name} at ${client.company}`
+        }
+      }
+      const { table, col } = TAG_LINK[entity]
+      const add = await resolveTags(supabase, orgId, userId, input.add || [], true)
+      if (add.ids.length) {
+        await supabase.from(table).upsert(add.ids.map(tag_id => ({ [col]: recordId, tag_id, org_id: orgId })), { onConflict: `${col},tag_id`, ignoreDuplicates: true })
+      }
+      const rem = await resolveTags(supabase, orgId, userId, input.remove || [], false)
+      if (rem.ids.length) await supabase.from(table).delete().eq(col, recordId).in("tag_id", rem.ids)
+      return {
+        success: true, record: label, tags: await tagNamesFor(supabase, entity, recordId!),
+        ...(add.created.length ? { created_tags: add.created } : {}),
+        ...(add.missing.length ? { not_added: add.missing, note: "Only admins can create new tags in this org." } : {}),
+        action: "tagged_record",
+      }
     }
 
     case "get_client_overview": {
@@ -506,7 +645,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         supabase.from("tasks").select("id, title, due_date, status")
           .eq("org_id", orgId).eq("client_id", client.id).neq("status", "completed").limit(5),
       ])
-      return { client, contacts: contacts || [], proposals: proposals || [], tickets: tickets || [], pending_tasks: tasks || [] }
+      const clientTags = await tagNamesFor(supabase, "client", client.id)
+      return { client: { ...client, tags: clientTags }, contacts: contacts || [], proposals: proposals || [], tickets: tickets || [], pending_tasks: tasks || [] }
     }
 
     case "create_client": {
@@ -588,6 +728,22 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       if (input.query) {
         const q = `%${input.query}%`
         query = query.or(`proposal_name.ilike.${q},company.ilike.${q},client_name.ilike.${q}`)
+      }
+      if (input.tag) {
+        const tag = await findTag(supabase, orgId, input.tag)
+        if (!tag) return { results: [], note: `No tag named "${input.tag}". Use list_tags to see tags.` }
+        const [{ data: pl }, { data: cl }] = await Promise.all([
+          supabase.from("proposal_tags").select("proposal_id").eq("tag_id", tag.id),
+          supabase.from("client_tags").select("client_id").eq("tag_id", tag.id),
+        ])
+        const ids = new Set<string>((pl || []).map((r: any) => r.proposal_id))
+        const cids = (cl || []).map((r: any) => r.client_id)
+        if (cids.length) {
+          const { data: viaClient } = await supabase.from("proposals").select("id").eq("org_id", orgId).in("client_id", cids)
+          for (const r of viaClient || []) ids.add(r.id)
+        }
+        if (!ids.size) return { results: [] }
+        query = query.in("id", [...ids])
       }
       const { data } = await query
       const results = (data || []).map((p: any) => ({
