@@ -6,7 +6,7 @@ import { clientName } from '../utils/client'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { usePermissions } from '../hooks/usePermissions'
 import { normalizeLinkedIn } from '../lib/linkedin'
-import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER, BulkTagBar } from '../components/tags/tags'
+import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER, BulkTagBar, TagEditor, applyTags } from '../components/tags/tags'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -64,6 +64,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const tagApi = useTags(['client'])
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(() => new Set()) // company names
+  const [pendingContactTags, setPendingContactTags] = useState([])
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
@@ -144,7 +145,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     setError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-    const { error } = await supabase.from('client_contacts').insert({
+    const { data: newContact, error } = await supabase.from('client_contacts').insert({
       ...contactForm,
       linkedin_url: li.url,
       client_id: panel.clientId,
@@ -152,8 +153,10 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       is_primary: false,
       notes: '',
       location_id: null,
-    })
+    }).select('id').single()
     if (error) { setError(error.message); setSaving(false); return }
+    if (newContact?.id && pendingContactTags.length) await applyTags('contact', newContact.id, pendingContactTags, profile.org_id)
+    setPendingContactTags([])
     setContactForm({ full_name: '', title: '', email: '', phone: '' })
     setPanel(null)
     setSaving(false)
@@ -431,7 +434,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                           onClick={async e => {
                             e.stopPropagation()
                             setPanel({ clientId: navigateTo, company })
-                            setContactForm({ full_name: '', title: '', email: '', phone: '', notes: '', location_id: null, is_primary: false })
+                            setContactForm({ full_name: '', title: '', email: '', phone: '', notes: '', location_id: null, is_primary: false }); setPendingContactTags([])
                             setError(null)
                             const { data: locs } = await supabase.from('client_locations').select('id, site_name').eq('client_id', navigateTo)
                             setPanelLocations(locs || [])
@@ -740,6 +743,11 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                   onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))}
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
+              </div>
+
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Tags</label>
+                <TagEditor api={tagApi} entity="contact" pending={pendingContactTags} onPendingChange={setPendingContactTags} />
               </div>
 
               <div>

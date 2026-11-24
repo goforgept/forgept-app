@@ -9,7 +9,7 @@ import ActivityTimeline from '../components/ActivityTimeline'
 import TaskList from '../components/TaskList'
 import { clientName } from '../utils/client'
 import { normalizeLinkedIn, LinkedInIcon } from '../lib/linkedin'
-import { useTags, TagEditor, TagList } from '../components/tags/tags'
+import { useTags, TagEditor, TagList, applyTags } from '../components/tags/tags'
 
 const INDUSTRIES = [
   'Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security',
@@ -70,6 +70,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [savingContact, setSavingContact] = useState(false)
   const [linkedinError, setLinkedinError] = useState(null)
   const tagApi = useTags(['client', 'contact'])
+  const [pendingContactTags, setPendingContactTags] = useState([])
   // Subscriptions
   const [subscriptions, setSubscriptions] = useState([])
   const [editingSub, setEditingSub] = useState(null)
@@ -341,6 +342,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const openAddContact = () => {
     setPanelForm(emptyContact)
     setLinkedinError(null)
+    setPendingContactTags([])
     setContactPanel('new')
   }
 
@@ -375,6 +377,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
         .insert({ ...row, client_id: id, org_id: profile.org_id })
         .select('id').single()
       savedContactId = newContact?.id
+      if (savedContactId && pendingContactTags.length) {
+        await applyTags('contact', savedContactId, pendingContactTags, profile.org_id)
+        tagApi.reload()
+      }
     }
     await fetchContacts()
     setContactPanel(null)
@@ -1522,7 +1528,7 @@ const deleteMeeting = async (meetingId) => {
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Tags</label>
                 {contactPanel === 'new'
-                  ? <p className="text-fp-muted text-xs">Save the contact first, then add tags.</p>
+                  ? <TagEditor api={tagApi} entity="contact" canEdit={canWrite('clients')} pending={pendingContactTags} onPendingChange={setPendingContactTags} />
                   : <TagEditor api={tagApi} entity="contact" id={contactPanel.id} canEdit={canWrite('clients')} />}
               </div>
               <div>

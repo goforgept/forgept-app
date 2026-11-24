@@ -71,6 +71,21 @@ async function fetchAll(build) {
   return out
 }
 
+/** Copy a record's tags to another record (new revision, duplicate). */
+export async function copyTags(entity, fromId, toId, orgId) {
+  const { table, col } = TAG_LINKS[entity]
+  const { data } = await supabase.from(table).select('tag_id').eq(col, fromId)
+  if (!data?.length) return
+  await supabase.from(table).upsert(data.map(r => ({ [col]: toId, tag_id: r.tag_id, org_id: orgId })), { onConflict: `${col},tag_id`, ignoreDuplicates: true })
+}
+
+/** Apply a list of tag ids to a newly created record. */
+export async function applyTags(entity, id, tagIds, orgId) {
+  if (!tagIds?.length) return
+  const { table, col } = TAG_LINKS[entity]
+  await supabase.from(table).upsert(tagIds.map(tag_id => ({ [col]: id, tag_id, org_id: orgId })), { onConflict: `${col},tag_id`, ignoreDuplicates: true })
+}
+
 // ── Hook: org tag library + links ────────────────────────────────────────────
 /**
  * Loads the org's tags and which records carry them.
@@ -211,14 +226,23 @@ export function TagList({ tags = [], inherited = [], max = 4, inheritedTitle = '
 }
 
 // ── Editor: chips + "+ Tag" with autocomplete ────────────────────────────────
-export function TagEditor({ api, entity, id, canEdit = true, inherited = [], inheritedTitle = 'From client' }) {
+/**
+ * Pass `pending` + `onPendingChange` (array of tag ids) for a record that doesn't exist yet;
+ * the caller saves them with applyTags() after creating the record.
+ */
+export function TagEditor({ api, entity, id, canEdit = true, inherited = [], inheritedTitle = 'From client', pending, onPendingChange }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const boxRef = useRef(null)
-  const current = api.tagsFor(entity, id)
+  const isPending = Array.isArray(pending)
+  const current = isPending
+    ? pending.map(tid => api.tagById[tid]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
+    : api.tagsFor(entity, id)
   const currentIds = new Set(current.map(t => t.id))
+  const addTag = (tagId) => isPending ? onPendingChange([...new Set([...pending, tagId])]) : api.add(entity, id, tagId)
+  const removeTag = (tagId) => isPending ? onPendingChange(pending.filter(t => t !== tagId)) : api.remove(entity, id, tagId)
 
   useEffect(() => {
     if (!open) return
@@ -237,7 +261,7 @@ export function TagEditor({ api, entity, id, canEdit = true, inherited = [], inh
   const showCreate = query && !exact && api.canCreate
 
   const pick = async (tag) => {
-    await api.add(entity, id, tag.id)
+    await addTag(tag.id)
     setQ(''); setErr(null)
   }
   const createAndAdd = async () => {
@@ -261,7 +285,7 @@ export function TagEditor({ api, entity, id, canEdit = true, inherited = [], inh
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" ref={boxRef} onClick={e => e.stopPropagation()}>
-      {current.map(t => <TagChip key={t.id} tag={t} onRemove={canEdit ? () => api.remove(entity, id, t.id) : undefined} />)}
+      {current.map(t => <TagChip key={t.id} tag={t} onRemove={canEdit ? () => removeTag(t.id) : undefined} />)}
       {inheritedShown.map(t => <TagChip key={`i${t.id}`} tag={t} dim title={`${t.name} · ${inheritedTitle}`} />)}
       {canEdit && (
         <div className="relative">

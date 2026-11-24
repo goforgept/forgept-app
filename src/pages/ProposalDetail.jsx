@@ -44,6 +44,7 @@ import TermsSection from '../components/proposal/TermsSection'
 import { htmlToPlain, renderHtmlToPdf } from '../components/proposal/RichTextEditor'
 import CatalogSearch from '../components/CatalogSearch'
 import { APP_BASE_URL } from '../config'
+import { copyTags } from '../components/tags/tags'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -3114,6 +3115,8 @@ export default function ProposalDetail({ isAdmin }) {
         )
       }
 
+      await copyTags('proposal', id, newProposal.id, profile.org_id)
+
       setShowDuplicateModal(false)
       navigate(`/proposal/${newProposal.id}`)
     } catch (err) {
@@ -3159,6 +3162,7 @@ export default function ProposalDetail({ isAdmin }) {
         dSheets.map(({ id: _, created_at: __, ...ds }) => ({ ...ds, proposal_id: newProposal.id, status: 'draft' }))
       ),
       supabase.from('proposals').update({ is_current_revision: false }).eq('id', id),
+      copyTags('proposal', id, newProposal.id, newProposal.org_id),
     ])
 
     navigate(`/proposal/${newProposal.id}`)
