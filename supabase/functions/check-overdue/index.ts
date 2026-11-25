@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { isCronRequest } from "../_shared/cron.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,16 +31,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const authHeader = req.headers.get('Authorization') ?? ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-  let authorized = false
-  try {
-    const parts = token.split('.')
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-      authorized = payload?.role === 'service_role'
-    }
-  } catch { /* invalid JWT */ }
+  const authorized = isCronRequest(req)
 
   if (!authorized) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {

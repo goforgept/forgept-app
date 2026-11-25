@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { sendEmail } from "../_shared/email.ts"
+import { validateUser } from "../_shared/auth.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,15 +41,24 @@ Deno.serve(async (req) => {
     if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') {
       const authHeader = req.headers.get('Authorization')
 
-      // Accept either a valid user JWT or the cron secret
-      const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
-      if (!isCron && !authHeader?.startsWith('Bearer ')) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
+      // Accept the cron secret, or a real signed-in user. The gateway's JWT check is off for this
+      // function (verify_jwt = false), so the token must be verified here — a "Bearer" prefix alone
+      // would let anyone on the internet send mail through our domain.
+      const isCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+      let senderEmail = ''
+      if (!isCron) {
+        const { user, error } = await validateUser(req)
+        if (error || !user) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        senderEmail = user.email ?? ''
       }
-      const { toEmail, toName, fromName, fromEmail, subject, body: emailBody } = body
+      const { toEmail, toName, fromName, subject, body: emailBody } = body
+      // Replies go to the verified sender, never to an address supplied in the request
+      const fromEmail = isCron ? body.fromEmail : senderEmail
 
       if (!toEmail || !subject || !emailBody) {
         return new Response(JSON.stringify({ error: 'Missing required fields' }), {
