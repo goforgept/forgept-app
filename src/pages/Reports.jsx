@@ -191,7 +191,7 @@ const REPORT_FILTERS = {
   invoices:         ['status'],
   purchase_orders:  ['vendor', 'status'],
   client_report:    [],
-  vendor_spend:     [],
+  vendor_spend:     ['status'],
   user_activity:    [],
   payroll:          ['tech'],
   pm_performance:   [],
@@ -229,6 +229,7 @@ export default function Reports(props) {
   const [clientLoading, setClientLoading]   = useState(false)
 
   const [vendorLineItems, setVendorLineItems] = useState({}) // vendor → grouped items
+  const [vendorTotals, setVendorTotals] = useState(null)
   const [expandedVendor, setExpandedVendor]   = useState(null)
   const [vendorSearch, setVendorSearch]       = useState('')
 
@@ -514,42 +515,66 @@ export default function Reports(props) {
     // ── Vendor Summary ────────────────────────────────────────────────────────
     if (activeReport === 'vendor_spend') {
       setExpandedVendor(null)
-      let pq = supabase.from('proposals').select('id').eq('org_id', profile.org_id)
-      if (from) pq = pq.gte('created_at', from)
-      if (to)   pq = pq.lte('created_at', to + 'T23:59:59')
-      const { data: proposals } = await pq
-      const ids = (proposals || []).map(p => p.id)
-      if (ids.length === 0) { setData([]); setVendorLineItems({}); setLoading(false); return }
-      const { data: rows } = await supabase
-        .from('bom_line_items')
-        .select('manufacturer, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
-        .in('proposal_id', ids)
-
-      const byVendor = Object.create(null)
-      const byVendorItems = Object.create(null)
-      for (const r of (rows || [])) {
-        const v = r.manufacturer || 'Unknown'
-        if (!byVendor[v]) { byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }; byVendorItems[v] = Object.create(null) }
-        byVendor[v].items++
-        byVendor[v].units   += Number(r.quantity) || 0
-        byVendor[v].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
-        byVendor[v].revenue += Number(r.customer_price_total) || 0
-        // Group by part number within vendor
-        const key = r.part_number_sku || r.item_name || 'Unknown'
-        if (!byVendorItems[v][key]) byVendorItems[v][key] = { name: r.item_name || '—', sku: r.part_number_sku || '—', category: r.category || '—', qty: 0, cost: 0, revenue: 0 }
-        byVendorItems[v][key].qty     += Number(r.quantity) || 0
-        byVendorItems[v][key].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
-        byVendorItems[v][key].revenue += Number(r.customer_price_total) || 0
+      // Current revisions only (no double counting of old revisions), not archived; paged past 1000 rows
+      const proposals = []
+      for (let f = 0; ; f += 1000) {
+        let pq = supabase.from('proposals').select('id, status').eq('org_id', profile.org_id)
+          .eq('is_current_revision', true).is('archived_at', null)
+        if (from) pq = pq.gte('created_at', from)
+        if (to)   pq = pq.lte('created_at', to + 'T23:59:59')
+        if (filters.status) pq = pq.eq('status', filters.status)
+        const { data: page } = await pq.range(f, f + 999)
+        proposals.push(...(page || []))
+        if (!page || page.length < 1000) break
+      }
+      const statusOf = new Map(proposals.map(p => [p.id, p.status]))
+      const ids = proposals.map(p => p.id)
+      if (ids.length === 0) { setData([]); setVendorLineItems({}); setVendorTotals(null); setLoading(false); return }
+      const rows = []
+      for (let i = 0; i < ids.length; i += 150) {
+        const chunk = ids.slice(i, i + 150)
+        for (let f = 0; ; f += 1000) {
+          const { data: page } = await supabase.from('bom_line_items')
+            .select('proposal_id, manufacturer, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
+            .in('proposal_id', chunk).range(f, f + 999)
+          rows.push(...(page || []))
+          if (!page || page.length < 1000) break
+        }
       }
 
+      const blank = () => ({ items: 0, units: 0, cost: 0, revenue: 0, wonUnits: 0, wonCost: 0, wonRevenue: 0 })
+      const byVendor = Object.create(null)
+      const byVendorItems = Object.create(null)
+      const totals = blank()
+      for (const r of rows) {
+        const v = r.manufacturer || 'Unknown'
+        const won = statusOf.get(r.proposal_id) === 'Won'
+        const qty = Number(r.quantity) || 0
+        const cost = (Number(r.your_cost_unit) || 0) * qty
+        const rev = Number(r.customer_price_total) || 0
+        if (!byVendor[v]) { byVendor[v] = blank(); byVendorItems[v] = Object.create(null) }
+        const key = r.part_number_sku || r.item_name || 'Unknown'
+        if (!byVendorItems[v][key]) byVendorItems[v][key] = { name: r.item_name || '—', sku: r.part_number_sku || '—', category: r.category || '—', qty: 0, wonQty: 0, cost: 0, revenue: 0, wonRevenue: 0 }
+        for (const t of [byVendor[v], totals]) {
+          t.items++; t.units += qty; t.cost += cost; t.revenue += rev
+          if (won) { t.wonUnits += qty; t.wonCost += cost; t.wonRevenue += rev }
+        }
+        const it = byVendorItems[v][key]
+        it.qty += qty; it.cost += cost; it.revenue += rev
+        if (won) { it.wonQty += qty; it.wonRevenue += rev }
+      }
+
+      setVendorTotals(totals)
       setVendorLineItems(
         Object.fromEntries(Object.entries(byVendorItems).map(([v, items]) => [
-          v, Object.values(items).sort((a, b) => b.cost - a.cost)
+          v, Object.values(items).sort((a, b) => b.revenue - a.revenue)
         ]))
       )
-      setData(Object.entries(byVendor).sort((a, b) => b[1].cost - a[1].cost).map(([vendor, v]) => ({
-        'Vendor': vendor, 'Line Items': v.items, 'Total Units': v.units,
-        'Total Cost': fmt$(v.cost), 'Total Revenue': fmt$(v.revenue),
+      const pct = (a, b) => b > 0 ? `${Math.round(a / b * 100)}%` : '—'
+      setData(Object.entries(byVendor).sort((a, b) => b[1].revenue - a[1].revenue).map(([vendor, v]) => ({
+        'Vendor': vendor, 'Line Items': v.items, 'Units Quoted': v.units, 'Units Won': v.wonUnits,
+        'Quoted Revenue': fmt$(v.revenue), 'Won Revenue': fmt$(v.wonRevenue), 'Won %': pct(v.wonRevenue, v.revenue),
+        'Quoted Cost': fmt$(v.cost), 'Won Cost': fmt$(v.wonCost),
       })))
     }
 
@@ -914,13 +939,13 @@ export default function Reports(props) {
       ])
       XLSX.utils.book_append_sheet(wb, ws1, 'Vendor Summary')
 
-      const aoa = [['Manufacturer', 'Item', 'SKU', 'Category', 'Qty', 'Total Cost', 'Total Revenue']]
+      const aoa = [['Manufacturer', 'Item', 'SKU', 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Revenue', 'Won Revenue']]
       for (const row of filtered) {
         const items = vendorLineItems[row['Vendor']] || []
         if (!items.length) continue
-        aoa.push([row['Vendor'], '', '', '', '', '', ''])
+        aoa.push([row['Vendor'], '', '', '', '', '', '', '', ''])
         for (const item of items) {
-          aoa.push(['', item.name, item.sku, item.category, item.qty, item.cost, item.revenue])
+          aoa.push(['', item.name, item.sku, item.category, item.qty, item.wonQty, item.cost, item.revenue, item.wonRevenue])
         }
         aoa.push([])
       }
@@ -1073,11 +1098,11 @@ export default function Reports(props) {
         bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
         margin: { left: 14, right: 14 },
       })
-      const itemCols = ['Vendor', 'Item', 'SKU', 'Category', 'Qty', 'Total Cost', 'Total Revenue']
+      const itemCols = ['Vendor', 'Item', 'SKU', 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Rev', 'Won Rev']
       const itemRows = []
       for (const row of filtered) {
         for (const item of (vendorLineItems[row['Vendor']] || [])) {
-          itemRows.push([row['Vendor'], item.name, item.sku, item.category, item.qty, fmt$(item.cost), fmt$(item.revenue)])
+          itemRows.push([row['Vendor'], item.name, item.sku, item.category, item.qty, item.wonQty, fmt$(item.cost), fmt$(item.revenue), fmt$(item.wonRevenue)])
         }
       }
       if (itemRows.length) {
@@ -1342,6 +1367,7 @@ export default function Reports(props) {
                               {activeReport === 'service_tickets' && ['Open','In Progress','Resolved','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                               {activeReport === 'invoices'        && ['Draft','Sent','Paid'].map(s => <option key={s} value={s}>{s}</option>)}
                               {activeReport === 'purchase_orders' && ['Draft','Sent','Partial','Received','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                              {activeReport === 'vendor_spend'    && [['Won','Won'],['Sent','Open (sent)'],['Draft','Draft'],['Lost','Lost']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                             </select>
                           </div>
                         )}
@@ -1532,7 +1558,26 @@ export default function Reports(props) {
                     ) : activeReport === 'vendor_spend' ? (
                       /* Vendor summary — expandable rows */
                       <div>
-                        <div className="px-4 py-3 border-b border-fp-border">
+                        <div className="px-4 py-3 border-b border-fp-border flex flex-wrap items-center gap-x-6 gap-y-3">
+                          {vendorTotals && (() => {
+                            const pct = vendorTotals.revenue > 0 ? Math.min(100, vendorTotals.wonRevenue / vendorTotals.revenue * 100) : 0
+                            const C = 2 * Math.PI * 14
+                            return (
+                              <div className="flex items-center gap-3">
+                                <div className="relative w-12 h-12 shrink-0">
+                                  <svg width="48" height="48" viewBox="0 0 36 36" aria-hidden="true" style={{ transform: 'rotate(-90deg)' }}>
+                                    <circle cx="18" cy="18" r="14" fill="none" stroke="var(--fp-inset)" strokeWidth="4" />
+                                    {pct > 0 && <circle cx="18" cy="18" r="14" fill="none" stroke="#22C55E" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(C * pct / 100).toFixed(2)} ${C.toFixed(2)}`} />}
+                                  </svg>
+                                  <span className="absolute inset-0 grid place-items-center text-fp-text text-[11px] font-bold tabular-nums">{Math.round(pct)}%</span>
+                                </div>
+                                <div className="text-sm">
+                                  <p className="text-fp-text font-semibold tabular-nums">{fmt$(vendorTotals.wonRevenue)} won <span className="text-fp-muted font-normal">of {fmt$(vendorTotals.revenue)} quoted</span></p>
+                                  <p className="text-fp-muted text-xs tabular-nums">Cost {fmt$(vendorTotals.wonCost)} won of {fmt$(vendorTotals.cost)} quoted{filters.status ? ` · ${filters.status === 'Sent' ? 'Open' : filters.status} proposals only` : ''}</p>
+                                </div>
+                              </div>
+                            )
+                          })()}
                           <input
                             type="text"
                             placeholder="Search vendor…"
@@ -1573,9 +1618,11 @@ export default function Reports(props) {
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Item</th>
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">SKU</th>
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Category</th>
-                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty</th>
+                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty Quoted</th>
+                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty Won</th>
                                                 <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Total Cost</th>
-                                                <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">Total Rev</th>
+                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Quoted Rev</th>
+                                                <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">Won Rev</th>
                                               </tr>
                                             </thead>
                                             <tbody>
@@ -1585,8 +1632,10 @@ export default function Reports(props) {
                                                   <td className="py-1.5 pr-4 text-fp-muted font-mono">{item.sku}</td>
                                                   <td className="py-1.5 pr-4 text-fp-muted">{item.category}</td>
                                                   <td className="py-1.5 pr-4 text-fp-text text-right">{item.qty}</td>
+                                                  <td className="py-1.5 pr-4 text-right text-green-500">{item.wonQty || '—'}</td>
                                                   <td className="py-1.5 pr-4 text-fp-text text-right">{fmt$(item.cost)}</td>
-                                                  <td className="py-1.5 text-fp-text text-right">{fmt$(item.revenue)}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-text text-right">{fmt$(item.revenue)}</td>
+                                                  <td className="py-1.5 text-right text-green-500">{item.wonRevenue ? fmt$(item.wonRevenue) : '—'}</td>
                                                 </tr>
                                               ))}
                                             </tbody>

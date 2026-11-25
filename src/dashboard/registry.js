@@ -19,7 +19,7 @@ export const WIDGETS = {
   'leaderboard':    { title: 'Rep leaderboard',      desc: 'Each rep ranked by won revenue, with open pipeline and margin', category: 'Team', component: Leaderboard, needs: [], w: 6, sizes: [4, 6, 8, 12], when: e => e.isTeam },
   'rep-targets':    { title: 'Rep targets',          desc: "This month's won revenue against each person's target", category: 'Team', component: RepTargets, needs: ['goals'], w: 6, sizes: [6, 8, 12], when: e => e.isTeam },
   'top-clients':    { title: 'Top clients',          desc: 'Clients with the most open and won business', category: 'Sales', component: TopClients, needs: ['clients'], w: 4, sizes: [4, 6, 12] },
-  'top-vendors':    { title: 'Top vendors',          desc: 'Vendors by quoted value', category: 'Sales', component: TopVendors, needs: ['vendorLines'], w: 4, sizes: [4, 6, 12], when: e => e.isTeam },
+  'top-vendors':    { title: 'Top vendors',          desc: 'Vendors by won value, with how much of what was quoted was won', category: 'Sales', component: TopVendors, needs: ['vendorLines'], w: 4, sizes: [4, 6, 12], when: e => e.isTeam },
   'agenda':         { title: 'Agenda',               desc: 'Your meetings and tasks for the next few days', category: 'Me', component: Agenda, needs: ['tasks'], w: 4, sizes: [4, 6, 12] },
   'activity':       { title: 'My activity',          desc: 'Calls, emails, meetings and more against your goals', category: 'Me', component: ActivityGoals, needs: ['goals'], w: 8, sizes: [4, 6, 8, 12] },
   'verse':          { title: 'Verse of the day',     desc: 'A Bible verse each day (King James Version)', category: 'Me', component: VerseOfTheDay, needs: [], w: 4, sizes: [4, 6, 8, 12] },

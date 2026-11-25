@@ -342,26 +342,38 @@ export function TopClients() {
 // ── Top vendors (donut) ──────────────────────────────────────────────────────
 export function TopVendors() {
   const { split, data, periodShort, go } = useDash()
-  const segs = useMemo(() => {
-    const ids = new Set(split.inPeriod.map(p => p.id))
+  const { segs, quotedTotal } = useMemo(() => {
+    // Quoted = every proposal in the period; won = proposals won in the period
+    const quotedIds = new Set(split.inPeriod.map(p => p.id))
+    const wonIds = new Set(split.won.map(p => p.id))
     const m = new Map()
+    let quotedTotal = 0
     ;(data.vendorLines || []).forEach(l => {
-      if (!ids.has(l.proposal_id) || !l.vendor) return
-      const r = m.get(l.vendor) || { label: l.vendor, value: 0, count: 0 }
-      r.value += l.customer_price_total || 0; r.count++
+      if (!l.vendor) return
+      const q = quotedIds.has(l.proposal_id), w = wonIds.has(l.proposal_id)
+      if (!q && !w) return
+      const r = m.get(l.vendor) || { label: l.vendor, value: 0, quoted: 0 }
+      const amt = l.customer_price_total || 0
+      if (q) { r.quoted += amt; quotedTotal += amt }
+      if (w) r.value += amt
       m.set(l.vendor, r)
     })
-    return [...m.values()].sort((a, b) => b.value - a.value).slice(0, 6).map((r, i) => ({ ...r, key: r.label, color: SERIES[i % SERIES.length] }))
+    const segs = [...m.values()].filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 6)
+      .map((r, i) => ({ ...r, key: r.label, color: SERIES[i % SERIES.length] }))
+    return { segs, quotedTotal }
   }, [split, data.vendorLines])
   const total = segs.reduce((s, x) => s + x.value, 0)
   return (
-    <Card title="Top vendors" sub={`By quoted value${periodShort ? ` · ${periodShort}` : ''}`} action={{ label: 'Vendors', onClick: () => go('/vendors') }}>
-      {segs.length === 0 ? <Empty>No vendor data yet.</Empty> : (
+    <Card title="Top vendors" sub={`By won value${periodShort ? ` · ${periodShort}` : ''}`} action={{ label: 'Vendors', onClick: () => go('/vendors') }}>
+      {segs.length === 0 ? <Empty>{quotedTotal > 0 ? `Nothing won yet in this period (${money(quotedTotal)} quoted).` : 'No vendor data yet.'}</Empty> : (
         <div className="flex items-center gap-5 flex-wrap">
-          <div className="mx-auto"><Donut size={132} thickness={18} segments={segs} ariaLabel={segs.map(s => `${s.label} ${money(s.value)}`).join(', ')}
-            center={<div><p className="text-fp-text text-base font-bold tabular-nums">{moneyShort(total)}</p><p className="text-fp-muted text-[11px]">top {segs.length}</p></div>} /></div>
-          <div className="flex-1 min-w-[180px]">
-            {segs.map(s => <LegendRow key={s.key} color={s.color} label={s.label} meta={`${s.count} lines`} value={moneyShort(s.value)} />)}
+          <div className="mx-auto"><Donut size={132} thickness={18} segments={segs} ariaLabel={segs.map(s => `${s.label} ${money(s.value)} won`).join(', ')}
+            center={<div><p className="text-fp-text text-base font-bold tabular-nums">{moneyShort(total)}</p><p className="text-fp-muted text-[11px]">won</p></div>} /></div>
+          <div className="flex-1 min-w-[200px]">
+            {segs.map(s => (
+              <LegendRow key={s.key} color={s.color} label={s.label}
+                meta={s.quoted > 0 ? `${Math.round(s.value / s.quoted * 100)}% of ${moneyShort(s.quoted)}` : ''} value={moneyShort(s.value)} />
+            ))}
           </div>
         </div>
       )}
