@@ -5,7 +5,7 @@ import { supabase } from '../supabase'
 import { fetchGoals } from '../lib/goals'
 import { todayYMD, DAY } from './util'
 
-const PROPOSAL_COLS = 'id,proposal_name,company,client_name,client_id,rep_name,rep_email,status,close_date,quote_expires_at,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,sent_at,user_id,collaborator_ids,has_recurring'
+const PROPOSAL_COLS = 'id,proposal_name,company,client_name,client_id,rep_name,rep_email,status,close_date,quote_expires_at,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,updated_at,sent_at,user_id,collaborator_ids,has_recurring,original_proposal_id,disable_followup_emails'
 
 /** Page through a query (Supabase caps a select at 1000 rows). build(from, to) returns the query. */
 async function pageAll(build) {
@@ -64,6 +64,14 @@ const SOURCES = {
     return data || []
   },
   // My open tasks and meetings: overdue plus the next two weeks (agenda + "today" summary)
+  // Proposal follow-ups from the last 30 days on, for proposals in scope (revisions share a chain)
+  followups: async ({ orgId, chainIds }) => {
+    const since = new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10)
+    const rows = await pageAll((f, t) => supabase.from('scheduled_followups')
+      .select('id, chain_id, proposal_id, step, status, send_on, subject, ai_generated, edited_by, notified_at, sent_at, skipped_by, skipped_at, skip_reason, cancel_reason, error, action_token')
+      .eq('org_id', orgId).gte('send_on', since).order('send_on').range(f, t))
+    return rows.filter(r => chainIds.has(r.chain_id))
+  },
   tasks: async ({ orgId, userId }) => {
     const until = new Date(Date.now() + 14 * DAY).toISOString().split('T')[0]
     const { data } = await supabase.from('tasks').select('id, title, due_date, start_time, meeting_type, priority, completed, client_id, clients(company)')
@@ -107,6 +115,7 @@ export function useDashboardData({ profile, scope, needs, regionScoped }) {
       orgId, userId, mine, regionUserIds, proposalIds,
       allIds: proposals.map(p => p.id),
       wonIds: proposals.filter(p => p.status === 'Won').map(p => p.id),
+      chainIds: new Set(proposals.map(p => p.original_proposal_id || p.id)),
     }
 
     const wanted = needKey.split(',').filter(k => k && SOURCES[k] && k !== 'profiles')

@@ -6,6 +6,7 @@ import { Receivables, Materials, Recurring, LaborForecast } from './widgets/mone
 import { OpsNumbers, OpsAlerts, ActiveJobs, CostVsBudget, HoursThisWeek, Deadlines } from './widgets/ops'
 import { Agenda, ActivityGoals, ProposalList } from './widgets/personal'
 import { VerseOfTheDay } from './widgets/verse'
+import { FollowUps } from './widgets/followups'
 
 export const SIZES = { 3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'Full' }
 
@@ -15,6 +16,7 @@ export const WIDGETS = {
   'pipeline':       { title: 'Pipeline by stage',    desc: 'Donut of drafts, sent, won and lost', category: 'Sales', component: PipelineDonut, needs: [], w: 8, sizes: [6, 8, 12] },
   'closing-soon':   { title: 'Closing soon',         desc: 'Deals with a close date in the next 30 days', category: 'Sales', component: ClosingSoon, needs: [], w: 6, sizes: [6, 8, 12] },
   'attention':      { title: 'Needs attention',      desc: 'Stale drafts, expiring and expired quotes, expired vendor pricing', category: 'Sales', component: NeedsAttention, needs: ['expiredPricing'], w: 6, sizes: [4, 6, 8, 12] },
+  'followups':      { title: 'Follow-ups',           desc: 'Proposal follow-ups to review, coming up and falling through; skips by rep for managers', category: 'Sales', component: FollowUps, needs: ['followups'], w: 6, sizes: [4, 6, 8, 12] },
   'won-trend':      { title: 'Won by month',         desc: 'Won revenue for the last 12 months', category: 'Sales', component: WonTrend, needs: [], w: 8, sizes: [6, 8, 12] },
   'leaderboard':    { title: 'Rep leaderboard',      desc: 'Each rep ranked by won revenue, with open pipeline and margin', category: 'Team', component: Leaderboard, needs: [], w: 6, sizes: [4, 6, 8, 12], when: e => e.isTeam },
   'rep-targets':    { title: 'Rep targets',          desc: "This month's won revenue against each person's target", category: 'Team', component: RepTargets, needs: ['goals'], w: 6, sizes: [6, 8, 12], when: e => e.isTeam },
