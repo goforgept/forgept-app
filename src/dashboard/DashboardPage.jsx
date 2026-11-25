@@ -1,6 +1,6 @@
 // The dashboard page: greeting, today summary, tabs, and a 12-column grid of widgets.
 // Rep, admin, sales manager and PM dashboards are all this page with a different default layout.
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import { supabase } from '../supabase'
@@ -12,26 +12,8 @@ import { defaultLayout, normalize, fromLegacy } from './layouts'
 import { Greeting, TodayStrip } from './Greeting'
 import { CustomizePanel } from './CustomizePanel'
 import { Skeleton } from './ui'
+import { WidgetGrid, TabBar } from './EditableGrid'
 import { PERIODS, PERIOD_SHORT, normalizePeriod, splitByPeriod } from './util'
-
-const SPAN = {
-  3: 'col-span-12 sm:col-span-6 xl:col-span-3',
-  4: 'col-span-12 md:col-span-6 xl:col-span-4',
-  6: 'col-span-12 xl:col-span-6',
-  8: 'col-span-12 xl:col-span-8',
-  12: 'col-span-12',
-}
-
-/** One broken widget shouldn't take the whole dashboard down. */
-class WidgetBoundary extends Component {
-  constructor(p) { super(p); this.state = { failed: false } }
-  static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(e) { console.error('dashboard widget failed:', this.props.type, e) }
-  render() {
-    if (this.state.failed) return <div className="h-full bg-fp-card border border-fp-border rounded-2xl p-5 text-fp-muted text-sm">{WIDGETS[this.props.type]?.title || 'This widget'} couldn't load.</div>
-    return this.props.children
-  }
-}
 
 const readLS = (k) => { try { return localStorage.getItem(k) } catch { return null } }
 const writeLS = (k, v) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } }
@@ -52,6 +34,7 @@ export default function DashboardPage({ profile, dashKey, scope, role, sidebarPr
   const [hasLayoutColumn, setHasLayoutColumn] = useState(true)
   const [activeTab, setActiveTabState] = useState(null)
   const [showCustomize, setShowCustomize] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [saveState, setSaveState] = useState('idle')
   const saveTimer = useRef(null)
 
@@ -177,10 +160,10 @@ export default function DashboardPage({ profile, dashKey, scope, role, sidebarPr
                 className="h-10 bg-fp-card border border-fp-border text-fp-text text-sm font-medium rounded-xl px-3 focus:outline-none focus:border-fp-brand cursor-pointer">
                 {Object.entries(PERIODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
               </select>
-              <button onClick={() => setShowCustomize(true)} disabled={!layout}
+              <button onClick={() => setEditing(e => !e)} disabled={!layout} aria-pressed={editing}
                 className="h-10 inline-flex items-center gap-2 px-4 rounded-xl border border-fp-border text-fp-text text-sm font-semibold hover:bg-fp-hover transition-colors">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /></svg>
-                Customize
+                {editing ? 'Done' : 'Customize'}
               </button>
               {role !== 'pm' && (
                 <button onClick={() => navigate('/new')} className="h-10 px-4 rounded-xl bg-fp-brand text-white text-sm font-semibold hover:opacity-90">+ New proposal</button>
@@ -191,15 +174,19 @@ export default function DashboardPage({ profile, dashKey, scope, role, sidebarPr
 
             <TodayStrip />
 
-            {layout && layout.tabs.length > 1 && (
-              <div role="tablist" aria-label="Dashboard tabs" className="flex gap-1 border-b border-fp-border overflow-x-auto">
-                {layout.tabs.map(t => (
-                  <button key={t.id} role="tab" aria-selected={t.id === tab?.id} onClick={() => setActiveTab(t.id)}
-                    className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${t.id === tab?.id ? 'border-fp-brand text-fp-text' : 'border-transparent text-fp-muted hover:text-fp-text'}`}>
-                    {t.name}
-                  </button>
-                ))}
+            {editing && layout && (
+              <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-fp-bg/95 backdrop-blur border-b border-fp-border flex flex-wrap items-center gap-3">
+                <p className="flex-1 min-w-[220px] text-fp-text text-sm"><strong className="font-semibold">Editing layout.</strong> <span className="text-fp-muted">Drag cards or tabs to move them. Drag a card's right edge to resize it.</span></p>
+                <span className="text-fp-muted text-xs">{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Saved on this device only' : ''}</span>
+                <button onClick={() => setShowCustomize(true)} className="h-9 px-3 rounded-lg border border-fp-border text-fp-text text-sm font-semibold hover:bg-fp-hover">+ Add widgets</button>
+                <button onClick={() => setShowCustomize(true)} className="h-9 px-3 rounded-lg border border-fp-border text-fp-text text-sm font-semibold hover:bg-fp-hover">Tabs &amp; period</button>
+                <button onClick={() => setEditing(false)} className="h-9 px-4 rounded-lg bg-fp-brand text-white text-sm font-semibold hover:opacity-90">Done</button>
               </div>
+            )}
+
+            {layout && (
+              <TabBar tabs={layout.tabs} activeId={tab?.id} onSelect={setActiveTab} editing={editing}
+                onReorder={(tabs) => updateLayout({ ...layout, tabs })} />
             )}
 
             {!layout || loading ? (
@@ -217,17 +204,8 @@ export default function DashboardPage({ profile, dashKey, scope, role, sidebarPr
                 <button onClick={() => setShowCustomize(true)} className="mt-4 h-9 px-4 rounded-lg bg-fp-brand text-white text-sm font-semibold">Add widgets</button>
               </div>
             ) : (
-              <div className="grid grid-cols-12 gap-4 items-stretch">
-                {tab.widgets.map(w => {
-                  const W = WIDGETS[w.type]?.component
-                  if (!W) return null
-                  return (
-                    <div key={w.i} className={`${SPAN[w.w] || SPAN[12]} min-w-0 empty:hidden`}>
-                      <WidgetBoundary type={w.type}><W /></WidgetBoundary>
-                    </div>
-                  )
-                })}
-              </div>
+              <WidgetGrid widgets={tab.widgets} editing={editing}
+                onChange={(widgets) => updateLayout({ ...layout, tabs: layout.tabs.map(t => t.id === tab.id ? { ...t, widgets } : t) })} />
             )}
           </div>
         </DashContext.Provider>
