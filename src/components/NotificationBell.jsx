@@ -12,6 +12,9 @@ const NOTIFICATION_TYPES = [
   { type: 'email_opened',       label: 'Email opened',             icon: '✉️' },
   { type: 'proposal_sent',      label: 'Proposal sent',            icon: '📄' },
   { type: 'invoice_sent',       label: 'Invoice sent',             icon: '🧾' },
+  { type: 'followup_preview',   label: 'Follow-up sends tomorrow', icon: '📨' },
+  { type: 'followup_sent',      label: 'Follow-up sent',           icon: '📤' },
+  { type: 'followup_failed',    label: 'Follow-up not sent',       icon: '⚠️' },
 ]
 
 function loadMuted() {
