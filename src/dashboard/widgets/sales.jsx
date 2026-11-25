@@ -237,26 +237,39 @@ export function Leaderboard() {
     return [...m.values()].map(r => ({ ...r, margin: r.margins.length ? r.margins.reduce((a, b) => a + b, 0) / r.margins.length : null }))
       .sort((a, b) => b.won - a.won || b.pipeline - a.pipeline)
   }, [split])
-  const maxWon = Math.max(1, ...reps.map(r => r.won))
+  const totalWon = reps.reduce((s, r) => s + r.won, 0)
+  // Top 6 reps get their own slice; everyone else is grouped so the donut stays readable
+  const segs = reps.filter(r => r.won > 0).slice(0, 6).map((r, i) => ({ key: r.name, label: r.name, value: r.won, color: SERIES[i % SERIES.length] }))
+  const rest = reps.filter(r => r.won > 0).slice(6).reduce((s, r) => s + r.won, 0)
+  if (rest > 0) segs.push({ key: '__rest', label: 'Everyone else', value: rest, color: C.slate })
+  const colorOf = new Map(segs.map(s => [s.key, s.color]))
+  const openRep = (name) => go(`/proposals?rep=${encodeURIComponent(name)}`)
   return (
     <Card title="Rep leaderboard" sub={`Ranked by won revenue${periodShort ? ` · ${periodShort}` : ''}`}>
       {reps.length === 0 ? <Empty>No proposals in this period yet.</Empty> : (
-        <div className="flex flex-col gap-1 max-h-[420px] overflow-y-auto">
-          {reps.map((r, i) => (
-            <button key={r.name} onClick={() => go(`/proposals?rep=${encodeURIComponent(r.name)}`)}
-              className="grid grid-cols-[22px_32px_minmax(0,1fr)_auto] gap-3 items-center text-left rounded-lg px-2 py-2 -mx-2 hover:bg-fp-hover/60">
-              <span className={`text-xs font-bold tabular-nums ${i < 3 ? 'text-fp-brand' : 'text-fp-muted'}`}>{i + 1}</span>
-              <Initials name={r.name} color={SERIES[i % SERIES.length]} />
-              <span className="min-w-0">
-                <span className="block text-fp-text text-sm font-medium truncate">{r.name}</span>
-                <span className="block h-1.5 rounded-full bg-fp-inset mt-1.5 overflow-hidden"><span className="block h-full rounded-full bg-green-500" style={{ width: `${r.won / maxWon * 100}%` }} /></span>
-              </span>
-              <span className="text-right">
-                <span className="block text-fp-text text-sm font-semibold tabular-nums">{money(r.won)}</span>
-                <span className="block text-fp-muted text-xs tabular-nums">{money(r.pipeline)} open{r.margin != null ? ` · ${r.margin.toFixed(0)}%` : ''}</span>
-              </span>
-            </button>
-          ))}
+        <div className="flex items-start gap-6 flex-wrap">
+          <div className="mx-auto">
+            <Donut size={176} segments={segs} onSelect={(s) => s.key !== '__rest' && openRep(s.key)}
+              ariaLabel={segs.map(s => `${s.label} ${money(s.value)}`).join(', ')}
+              center={<div><p className="text-fp-text text-lg font-bold tabular-nums">{moneyShort(totalWon)}</p><p className="text-fp-muted text-[11px]">won</p></div>} />
+          </div>
+          <div className="flex-1 min-w-[240px] max-h-[360px] overflow-y-auto">
+            {reps.map((r, i) => (
+              <button key={r.name} onClick={() => openRep(r.name)}
+                className="w-full grid grid-cols-[20px_10px_minmax(0,1fr)_auto] gap-3 items-center text-left py-2 border-t border-fp-border/60 first:border-t-0 hover:bg-fp-hover/50 rounded-md px-1 -mx-1">
+                <span className={`text-xs font-bold tabular-nums ${i < 3 ? 'text-fp-brand' : 'text-fp-muted'}`}>{i + 1}</span>
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: colorOf.get(r.name) || (r.won > 0 ? C.slate : 'var(--fp-inset)') }} />
+                <span className="min-w-0">
+                  <span className="block text-fp-text text-sm font-medium truncate">{r.name}</span>
+                  <span className="block text-fp-muted text-xs tabular-nums truncate">{money(r.pipeline)} open{r.margin != null ? ` · ${r.margin.toFixed(0)}% margin` : ''}</span>
+                </span>
+                <span className="text-right">
+                  <span className="block text-fp-text text-sm font-semibold tabular-nums">{money(r.won)}</span>
+                  <span className="block text-fp-muted text-xs tabular-nums">{totalWon ? Math.round(r.won / totalWon * 100) : 0}%</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </Card>
