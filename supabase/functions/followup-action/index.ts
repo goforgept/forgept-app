@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     else if (action === 'send_now') {
       if (!open) return json({ error: `This follow-up was already ${row.status}.` }, 409)
-      const r = await sendRow(db, { ...row, proposal_id: p.id }, { actorId })
+      const r = await sendRow(db, { ...row, proposal_id: p.id }, { actorId, manual: true })
       if (r.status !== 'sent') return json({ error: r.reason ? `Not sent: ${r.reason}.` : 'Not sent.' }, 409)
     }
 
@@ -110,7 +110,10 @@ Deno.serve(async (req) => {
         edited_by: names[fresh.edited_by] || null, edited_at: fresh.edited_at,
         skipped_by: names[fresh.skipped_by] || null, skip_reason: fresh.skip_reason, sent_at: fresh.sent_at,
         cancel_reason: fresh.cancel_reason, error: fresh.error,
-        warning: why && why !== 'hold' ? why : why === 'hold' ? 'This proposal is being revised. The follow-up waits until the revision is sent.' : null,
+        warning: !why || fresh.status !== 'scheduled' ? null
+          : why === 'paused' ? 'Follow-ups are turned off for this proposal. Nothing sends while they’re off; turn them back on from the proposal page to resume.'
+          : why === 'hold' ? 'This proposal is being revised. Follow-ups resume once the revision is sent; any that come due before then are skipped.'
+          : `This won’t send: ${why}.`,
       },
       proposal: { id: p.id, name: p.proposal_name, client_name: p.client_name, client_email: p.client_email, company: p.company },
     })

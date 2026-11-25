@@ -11,7 +11,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { isCronRequest } from "../_shared/cron.ts"
 import {
-  adminClient, must, localDate, localHour, addDays, businessDay, cadence, draft, currentProposal, blocker,
+  adminClient, must, localDate, localHour, addDays, businessDay, cadence, draft, currentProposal, blocker, PAUSE_REASON,
   sendRow, sendPreview, notify, loadRep, STEP_LABEL,
 } from "../_shared/followups.ts"
 
@@ -59,7 +59,14 @@ Deno.serve(async (req) => {
         for (const row of upcoming) {
           const p = await currentProposal(db, row.chain_id)
           const why = blocker(p)
-          if (why === 'hold') continue
+          if (why && PAUSE_REASON[why]) {
+            // Paused or being revised: no preview. Once its send day arrives, record it as not sent.
+            if (row.send_on <= today) {
+              await db.from('scheduled_followups').update({ status: 'cancelled', cancel_reason: PAUSE_REASON[why], updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'scheduled')
+              stats.cancelled++
+            }
+            continue
+          }
           if (why) {
             await db.from('scheduled_followups').update({ status: 'cancelled', cancel_reason: why, updated_at: new Date().toISOString() }).eq('id', row.id)
             stats.cancelled++
@@ -77,20 +84,29 @@ Deno.serve(async (req) => {
           // Keep a rep's own edits; otherwise draft fresh so it reflects the proposal as it is today
           const content = row.edited_by ? { subject: row.subject, body: row.body, ai_generated: row.ai_generated } : await draft(db, row, p, profile, !!org.followup_ai)
           const send_on = row.send_on < tomorrow ? tomorrow : row.send_on   // always give a day's notice
-          const updated = { ...content, send_on, proposal_id: p.id, notified_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          const updated = { ...content, send_on, proposal_id: p.id, updated_at: new Date().toISOString() }
           must(await db.from('scheduled_followups').update(updated).eq('id', row.id).eq('status', 'scheduled'), 'save draft')
 
+          // Tell the rep — email and bell. The send pass only sends rows marked notified, so a
+          // follow-up never goes out unless at least one of these actually reached the rep.
           const full = { ...row, ...updated }
+          let emailed = false
           if (profile?.email) {
-            try { await sendPreview(full, p, profile, { tz, hour: sendHour }); stats.previews++ }
+            try { await sendPreview(full, p, profile, { tz, hour: sendHour }); emailed = true; stats.previews++ }
             catch (e) { console.error(`preview email failed for ${row.id}:`, e) }
           }
-          await notify(db, {
+          const belled = await notify(db, {
             org_id: org.id, user_id: p.user_id, type: 'followup_preview',
             title: `Follow-up sends tomorrow — ${p.company || p.client_name || p.proposal_name}`,
             body: `${STEP_LABEL[row.step as keyof typeof STEP_LABEL]}: "${full.subject}". Review, edit or skip it.`,
-            link: `/followup/${row.action_token}`, dedup_key: `followup_preview:${row.id}`,
+            link: `/followup/${row.action_token}`, dedup_key: `followup_preview:${row.id}:${send_on}`,
           })
+          if (emailed || belled) {
+            must(await db.from('scheduled_followups').update({ notified_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'scheduled'), 'mark notified')
+          } else {
+            // Neither got through: leave it un-notified; tomorrow's run previews it again and moves the send a day
+            stats.errors.push(`preview not delivered for follow-up ${row.id}`)
+          }
         }
       } catch (e: any) {
         console.error(`follow-ups failed for org ${org.id}:`, e)

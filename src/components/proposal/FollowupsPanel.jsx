@@ -24,7 +24,7 @@ export default function FollowupsPanel({ proposal, canEdit }) {
     }
   }, [chainId])
 
-  useEffect(() => { load() }, [load, proposal?.close_date, proposal?.status])
+  useEffect(() => { load() }, [load, proposal?.close_date, proposal?.status, proposal?.disable_followup_emails])
 
   if (!proposal || rows === null) return null
 
@@ -40,8 +40,10 @@ export default function FollowupsPanel({ proposal, canEdit }) {
   }
 
   const Row = ({ r }) => {
-    const st = STATUS_STYLE[r.status] || STATUS_STYLE.scheduled
-    const detail = r.status === 'skipped' ? `Skipped by ${names[r.skipped_by] || 'the rep'}${r.skip_reason ? `: ${r.skip_reason}` : ''}`
+    const paused = r.status === 'scheduled' && proposal.disable_followup_emails
+    const st = paused ? { label: 'Paused', cls: 'bg-amber-500/15 text-amber-400' } : STATUS_STYLE[r.status] || STATUS_STYLE.scheduled
+    const detail = paused ? 'Won’t send while follow-ups are off'
+      : r.status === 'skipped' ? `Skipped by ${names[r.skipped_by] || 'the rep'}${r.skip_reason ? `: ${r.skip_reason}` : ''}`
       : r.status === 'cancelled' ? `Not sent: ${r.cancel_reason}`
       : r.status === 'sent' ? `Sent ${new Date(r.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       : r.subject ? `“${r.subject}”${r.edited_by ? ` · edited by ${names[r.edited_by] || 'rep'}` : r.ai_generated ? ' · AI draft' : ''}`
@@ -69,6 +71,9 @@ export default function FollowupsPanel({ proposal, canEdit }) {
         <h3 className="text-fp-text font-semibold">Follow-up emails</h3>
         <p className="text-fp-muted text-xs">You get a preview the day before each one</p>
       </div>
+      {!empty && proposal.disable_followup_emails && upcoming.length > 0 && (
+        <p className="text-amber-400 text-xs bg-amber-500/10 rounded-lg px-3 py-2 my-2">Follow-ups are off for this proposal. Nothing sends and you get no previews until you turn them back on; any that come due meanwhile are skipped.</p>
+      )}
       {empty ? <p className="text-fp-muted text-sm py-2">{empty}</p> : (
         <ul>
           {upcoming.map(r => <Row key={r.id} r={r} />)}

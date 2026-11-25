@@ -256,13 +256,20 @@ export async function currentProposal(db: SupabaseClient, chainId: string) {
   return rows.find(r => r.is_current_revision !== false) || rows[0] || null
 }
 
-/** null when sendable; otherwise the plain-English reason it can't go. 'hold' = revising, wait. */
+/** Temporary states: nothing sends or previews, later steps resume once cleared, and a step whose
+ *  send day arrives while in one of these is recorded as not sent (with this reason). */
+export const PAUSE_REASON: Record<string, string> = {
+  paused: 'Follow-ups were turned off for this proposal on the send day',
+  hold: 'Proposal was being revised on the send day',
+}
+
+/** null when sendable; 'paused' / 'hold' while temporarily stopped; otherwise the reason it never can. */
 export function blocker(p: any): string | null {
   if (!p) return 'Proposal was deleted'
   if (p.archived_at) return 'Proposal was archived'
   if (p.status === 'Won') return 'Deal was won'
   if (p.status === 'Lost') return 'Deal was lost'
-  if (p.disable_followup_emails) return 'Follow-ups were turned off for this proposal'
+  if (p.disable_followup_emails) return 'paused'
   if (p.status === 'Draft') return 'hold'
   if (p.status !== 'Sent') return `Proposal is ${p.status}`
   if (!p.client_email) return 'Client has no email address'
@@ -287,9 +294,11 @@ export function clientEmailHtml(body: string, profile: any, proposal: any) {
   </div>`
 }
 
-export async function notify(db: SupabaseClient, n: { org_id: string; user_id: string; type: string; title: string; body?: string; link?: string; dedup_key: string }) {
+/** Bell notification. Returns true when it was stored (or already existed). */
+export async function notify(db: SupabaseClient, n: { org_id: string; user_id: string; type: string; title: string; body?: string; link?: string; dedup_key: string }): Promise<boolean> {
   const { error } = await db.from('notifications').upsert({ ...n, read: false }, { onConflict: 'dedup_key', ignoreDuplicates: true })
-  if (error) console.error('notification insert failed:', error.message)
+  if (error) { console.error('notification insert failed:', error.message); return false }
+  return true
 }
 
 export async function activity(db: SupabaseClient, a: { proposal_id: string; client_id?: string | null; org_id: string; user_id: string | null; title: string; source: 'system' | 'user' }) {
@@ -298,13 +307,17 @@ export async function activity(db: SupabaseClient, a: { proposal_id: string; cli
 }
 
 /** Send one follow-up now. Re-checks the proposal first. Returns the row's new status. */
-export async function sendRow(db: SupabaseClient, row: any, opts: { actorId?: string | null } = {}): Promise<{ status: string; reason?: string }> {
+export async function sendRow(db: SupabaseClient, row: any, opts: { actorId?: string | null; manual?: boolean } = {}): Promise<{ status: string; reason?: string }> {
   const p = await currentProposal(db, row.chain_id)
   const why = blocker(p)
   if (why) {
-    if (why === 'hold') return { status: 'scheduled', reason: 'Proposal is being revised' }
-    await db.from('scheduled_followups').update({ status: 'cancelled', cancel_reason: why, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'scheduled')
-    return { status: 'cancelled', reason: why }
+    // "Send now" while paused/revising: refuse, leave it scheduled
+    if (opts.manual && PAUSE_REASON[why]) {
+      return { status: 'scheduled', reason: why === 'paused' ? 'follow-ups are turned off for this proposal' : 'the proposal is being revised' }
+    }
+    const reason = PAUSE_REASON[why] || why
+    await db.from('scheduled_followups').update({ status: 'cancelled', cancel_reason: reason, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'scheduled')
+    return { status: 'cancelled', reason }
   }
 
   const profile = await loadRep(db, p.user_id, p.org_id)
