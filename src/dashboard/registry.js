@@ -5,6 +5,7 @@ import { KeyNumbers, TargetProgress, PipelineDonut, ClosingSoon, NeedsAttention,
 import { Receivables, Materials, Recurring, LaborForecast } from './widgets/money'
 import { OpsNumbers, OpsAlerts, ActiveJobs, CostVsBudget, HoursThisWeek, Deadlines } from './widgets/ops'
 import { Agenda, ActivityGoals, ProposalList } from './widgets/personal'
+import { VerseOfTheDay } from './widgets/verse'
 
 export const SIZES = { 3: 'XS', 4: 'S', 6: 'M', 8: 'L', 12: 'Full' }
 
@@ -21,6 +22,7 @@ export const WIDGETS = {
   'top-vendors':    { title: 'Top vendors',          desc: 'Vendors by quoted value', category: 'Sales', component: TopVendors, needs: ['vendorLines'], w: 4, sizes: [4, 6, 12], when: e => e.isTeam },
   'agenda':         { title: 'Agenda',               desc: 'Your meetings and tasks for the next few days', category: 'Me', component: Agenda, needs: ['tasks'], w: 4, sizes: [4, 6, 12] },
   'activity':       { title: 'My activity',          desc: 'Calls, emails, meetings and more against your goals', category: 'Me', component: ActivityGoals, needs: ['goals'], w: 8, sizes: [4, 6, 8, 12] },
+  'verse':          { title: 'Verse of the day',     desc: 'A Bible verse each day (King James Version)', category: 'Me', component: VerseOfTheDay, needs: [], w: 4, sizes: [4, 6, 8, 12] },
   'proposals':      { title: 'Proposals list',       desc: 'Search and filter proposals', category: 'Me', component: ProposalList, needs: [], w: 12, sizes: [6, 8, 12] },
   'receivables':    { title: 'Invoicing & AR',       desc: 'Outstanding and overdue invoices, won deals not yet invoiced', category: 'Money', component: Receivables, needs: ['invoices'], w: 6, sizes: [4, 6, 12] },
   'materials':      { title: 'Purchase orders',      desc: 'POs on order, partly received and received', category: 'Money', component: Materials, needs: ['purchaseOrders'], w: 6, sizes: [4, 6, 12], when: e => !e.isManufacturer },
