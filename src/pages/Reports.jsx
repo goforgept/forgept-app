@@ -230,6 +230,10 @@ export default function Reports(props) {
 
   const [vendorLineItems, setVendorLineItems] = useState({}) // vendor → grouped items
   const [vendorTotals, setVendorTotals] = useState(null)
+  // Vendor Summary grouping: 'manufacturer' (who makes it) or 'vendor' (who we buy it from, e.g. ADI)
+  const [vendorGroup, setVendorGroup] = useState(() => { try { return localStorage.getItem('reports_vendor_group') || 'manufacturer' } catch { return 'manufacturer' } })
+  const vendorKey = vendorGroup === 'vendor' ? 'Vendor' : 'Manufacturer'
+  const otherKey  = vendorGroup === 'vendor' ? 'Manufacturer' : 'Bought From'
   const [expandedVendor, setExpandedVendor]   = useState(null)
   const [vendorSearch, setVendorSearch]       = useState('')
 
@@ -297,7 +301,7 @@ export default function Reports(props) {
 
   useEffect(() => {
     if (profile?.org_id && activeReport !== 'client_report') fetchReport()
-  }, [profile?.org_id, activeReport, dateFrom, dateTo, filters, tagApi.ready])
+  }, [profile?.org_id, activeReport, dateFrom, dateTo, filters, tagApi.ready, vendorGroup])
 
   const switchReport = (key) => {
     setActiveReport(key)
@@ -535,7 +539,7 @@ export default function Reports(props) {
         const chunk = ids.slice(i, i + 150)
         for (let f = 0; ; f += 1000) {
           const { data: page } = await supabase.from('bom_line_items')
-            .select('proposal_id, manufacturer, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
+            .select('proposal_id, manufacturer, vendor, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
             .in('proposal_id', chunk).range(f, f + 999)
           rows.push(...(page || []))
           if (!page || page.length < 1000) break
@@ -547,14 +551,16 @@ export default function Reports(props) {
       const byVendorItems = Object.create(null)
       const totals = blank()
       for (const r of rows) {
-        const v = r.manufacturer || 'Unknown'
+        const byVendorSide = vendorGroup === 'vendor'
+        const v = byVendorSide ? (r.vendor?.trim() || 'No vendor set') : (r.manufacturer?.trim() || 'Unknown')
+        const other = byVendorSide ? (r.manufacturer?.trim() || '—') : (r.vendor?.trim() || '—')
         const won = statusOf.get(r.proposal_id) === 'Won'
         const qty = Number(r.quantity) || 0
         const cost = (Number(r.your_cost_unit) || 0) * qty
         const rev = Number(r.customer_price_total) || 0
         if (!byVendor[v]) { byVendor[v] = blank(); byVendorItems[v] = Object.create(null) }
-        const key = r.part_number_sku || r.item_name || 'Unknown'
-        if (!byVendorItems[v][key]) byVendorItems[v][key] = { name: r.item_name || '—', sku: r.part_number_sku || '—', category: r.category || '—', qty: 0, wonQty: 0, cost: 0, revenue: 0, wonRevenue: 0 }
+        const key = `${r.part_number_sku || r.item_name || 'Unknown'}|${other}`
+        if (!byVendorItems[v][key]) byVendorItems[v][key] = { name: r.item_name || '—', sku: r.part_number_sku || '—', other, category: r.category || '—', qty: 0, wonQty: 0, cost: 0, revenue: 0, wonRevenue: 0 }
         for (const t of [byVendor[v], totals]) {
           t.items++; t.units += qty; t.cost += cost; t.revenue += rev
           if (won) { t.wonUnits += qty; t.wonCost += cost; t.wonRevenue += rev }
@@ -572,7 +578,7 @@ export default function Reports(props) {
       )
       const pct = (a, b) => b > 0 ? `${Math.round(a / b * 100)}%` : '—'
       setData(Object.entries(byVendor).sort((a, b) => b[1].revenue - a[1].revenue).map(([vendor, v]) => ({
-        'Vendor': vendor, 'Line Items': v.items, 'Units Quoted': v.units, 'Units Won': v.wonUnits,
+        [vendorKey]: vendor, 'Line Items': v.items, 'Units Quoted': v.units, 'Units Won': v.wonUnits,
         'Quoted Revenue': fmt$(v.revenue), 'Won Revenue': fmt$(v.wonRevenue), 'Won %': pct(v.wonRevenue, v.revenue),
         'Quoted Cost': fmt$(v.cost), 'Won Cost': fmt$(v.wonCost),
       })))
@@ -930,7 +936,7 @@ export default function Reports(props) {
 
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
-        ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
+        ? data.filter(r => String(r[vendorKey]).toLowerCase().includes(vendorSearch.toLowerCase()))
         : data
       const ws1 = XLSX.utils.aoa_to_sheet([
         ...brandHeader,
@@ -939,13 +945,13 @@ export default function Reports(props) {
       ])
       XLSX.utils.book_append_sheet(wb, ws1, 'Vendor Summary')
 
-      const aoa = [['Manufacturer', 'Item', 'SKU', 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Revenue', 'Won Revenue']]
+      const aoa = [[vendorKey, 'Item', 'SKU', otherKey, 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Revenue', 'Won Revenue']]
       for (const row of filtered) {
-        const items = vendorLineItems[row['Vendor']] || []
+        const items = vendorLineItems[row[vendorKey]] || []
         if (!items.length) continue
-        aoa.push([row['Vendor'], '', '', '', '', '', '', '', ''])
+        aoa.push([row[vendorKey], '', '', '', '', '', '', '', '', ''])
         for (const item of items) {
-          aoa.push(['', item.name, item.sku, item.category, item.qty, item.wonQty, item.cost, item.revenue, item.wonRevenue])
+          aoa.push(['', item.name, item.sku, item.other, item.category, item.qty, item.wonQty, item.cost, item.revenue, item.wonRevenue])
         }
         aoa.push([])
       }
@@ -1090,7 +1096,7 @@ export default function Reports(props) {
 
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
-        ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
+        ? data.filter(r => String(r[vendorKey]).toLowerCase().includes(vendorSearch.toLowerCase()))
         : data
       autoTable(doc, {
         startY, head: [columns], body: filtered.map(row => columns.map(c => row[c])),
@@ -1098,11 +1104,11 @@ export default function Reports(props) {
         bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
         margin: { left: 14, right: 14 },
       })
-      const itemCols = ['Vendor', 'Item', 'SKU', 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Rev', 'Won Rev']
+      const itemCols = [vendorKey, 'Item', 'SKU', otherKey, 'Category', 'Qty Quoted', 'Qty Won', 'Total Cost', 'Quoted Rev', 'Won Rev']
       const itemRows = []
       for (const row of filtered) {
-        for (const item of (vendorLineItems[row['Vendor']] || [])) {
-          itemRows.push([row['Vendor'], item.name, item.sku, item.category, item.qty, item.wonQty, fmt$(item.cost), fmt$(item.revenue), fmt$(item.wonRevenue)])
+        for (const item of (vendorLineItems[row[vendorKey]] || [])) {
+          itemRows.push([row[vendorKey], item.name, item.sku, item.other, item.category, item.qty, item.wonQty, fmt$(item.cost), fmt$(item.revenue), fmt$(item.wonRevenue)])
         }
       }
       if (itemRows.length) {
@@ -1578,9 +1584,18 @@ export default function Reports(props) {
                               </div>
                             )
                           })()}
+                          <div className="flex items-center gap-2" role="group" aria-label="Group by">
+                            <span className="text-fp-muted text-xs">Group by</span>
+                            <div className="flex rounded-lg overflow-hidden border border-fp-border">
+                              {[['manufacturer', 'Manufacturer'], ['vendor', 'Vendor (bought from)']].map(([k, l]) => (
+                                <button key={k} onClick={() => { setVendorGroup(k); setExpandedVendor(null); try { localStorage.setItem('reports_vendor_group', k) } catch {} }}
+                                  className={`px-3 py-1.5 text-xs font-semibold ${vendorGroup === k ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>{l}</button>
+                              ))}
+                            </div>
+                          </div>
                           <input
                             type="text"
-                            placeholder="Search vendor…"
+                            placeholder={vendorGroup === 'vendor' ? 'Search vendor…' : 'Search manufacturer…'}
                             value={vendorSearch}
                             onChange={e => setVendorSearch(e.target.value)}
                             className="bg-fp-inset border border-fp-border text-fp-text text-sm rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-fp-brand"
@@ -1596,9 +1611,9 @@ export default function Reports(props) {
                             </thead>
                             <tbody>
                               {data
-                                .filter(row => !vendorSearch || row['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
+                                .filter(row => !vendorSearch || String(row[vendorKey]).toLowerCase().includes(vendorSearch.toLowerCase()))
                                 .map((row, i) => {
-                                const vendor = row['Vendor']
+                                const vendor = row[vendorKey]
                                 const isOpen = expandedVendor === vendor
                                 const items  = vendorLineItems[vendor] || []
                                 return (
@@ -1612,11 +1627,15 @@ export default function Reports(props) {
                                     {isOpen && (
                                       <tr key={`${i}-detail`} className="border-b border-[#0F1C2E]/60 bg-fp-inset/60">
                                         <td colSpan={columns.length + 1} className="px-6 py-3">
+                                          {vendorGroup === 'vendor' && vendor !== 'No vendor set' && (
+                                            <button onClick={() => navigate(`/vendor?name=${encodeURIComponent(vendor)}`)} className="text-fp-brand text-xs font-semibold mb-2 hover:opacity-80">Open {vendor} →</button>
+                                          )}
                                           <table className="w-full text-xs">
                                             <thead>
                                               <tr className="border-b border-fp-border">
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Item</th>
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">SKU</th>
+                                                <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">{otherKey}</th>
                                                 <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Category</th>
                                                 <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty Quoted</th>
                                                 <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty Won</th>
@@ -1630,6 +1649,7 @@ export default function Reports(props) {
                                                 <tr key={j} className="border-b border-fp-border/40">
                                                   <td className="py-1.5 pr-4 text-fp-text">{item.name}</td>
                                                   <td className="py-1.5 pr-4 text-fp-muted font-mono">{item.sku}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-text">{item.other}</td>
                                                   <td className="py-1.5 pr-4 text-fp-muted">{item.category}</td>
                                                   <td className="py-1.5 pr-4 text-fp-text text-right">{item.qty}</td>
                                                   <td className="py-1.5 pr-4 text-right text-green-500">{item.wonQty || '—'}</td>

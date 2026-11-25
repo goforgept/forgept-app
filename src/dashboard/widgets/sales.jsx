@@ -367,11 +367,11 @@ export function TopVendors() {
     <Card title="Top vendors" sub={`By won value${periodShort ? ` · ${periodShort}` : ''}`} action={{ label: 'Vendors', onClick: () => go('/vendors') }}>
       {segs.length === 0 ? <Empty>{quotedTotal > 0 ? `Nothing won yet in this period (${money(quotedTotal)} quoted).` : 'No vendor data yet.'}</Empty> : (
         <div className="flex items-center gap-5 flex-wrap">
-          <div className="mx-auto"><Donut size={132} thickness={18} segments={segs} ariaLabel={segs.map(s => `${s.label} ${money(s.value)} won`).join(', ')}
+          <div className="mx-auto"><Donut size={132} thickness={18} segments={segs} onSelect={(s) => go(`/vendor?name=${encodeURIComponent(s.label)}`)} ariaLabel={segs.map(s => `${s.label} ${money(s.value)} won`).join(', ')}
             center={<div><p className="text-fp-text text-base font-bold tabular-nums">{moneyShort(total)}</p><p className="text-fp-muted text-[11px]">won</p></div>} /></div>
           <div className="flex-1 min-w-[200px]">
             {segs.map(s => (
-              <LegendRow key={s.key} color={s.color} label={s.label}
+              <LegendRow key={s.key} color={s.color} label={s.label} onClick={() => go(`/vendor?name=${encodeURIComponent(s.label)}`)}
                 meta={s.quoted > 0 ? `${Math.round(s.value / s.quoted * 100)}% of ${moneyShort(s.quoted)}` : ''} value={moneyShort(s.value)} />
             ))}
           </div>

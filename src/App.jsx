@@ -13,6 +13,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import ManageReps from './pages/ManageReps'
 import Proposals from './pages/Proposals'
 import Vendors from './pages/Vendors'
+import VendorDetail from './pages/VendorDetail'
 import Settings from './pages/Settings'
 import SquareCallback from './pages/SquareCallback'
 import GoogleCallback from './pages/GoogleCallback'
@@ -237,6 +238,7 @@ function App() {
             <Route path="/reps" element={<Navigate to="/settings" replace />} />
             <Route path="/proposals" element={<PermRoute area="proposals"><Proposals {...sharedProps} /></PermRoute>} />
             <Route path="/vendors" element={<PermRoute area="vendors"><Vendors {...sharedProps} /></PermRoute>} />
+            <Route path="/vendor" element={<PermRoute area="vendors"><VendorDetail {...sharedProps} /></PermRoute>} />
             <Route path="/settings" element={<Settings {...sharedProps} />} />
             <Route path="/clients" element={<PermRoute area="clients"><Clients {...sharedProps} /></PermRoute>} />
             {profile?.is_superadmin && <Route path="/superadmin" element={<SuperAdmin />} />}

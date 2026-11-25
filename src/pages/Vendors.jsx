@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { usePermissions } from '../hooks/usePermissions'
@@ -11,6 +12,7 @@ const emptyForm = {
 
 export default function Vendors({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { canWrite } = usePermissions()
+  const navigate = useNavigate()
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -228,7 +230,7 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                       <div className="grid grid-cols-4 gap-x-8 gap-y-2 flex-1">
                         <div>
                           <p className="text-fp-muted text-xs">Vendor</p>
-                          <p className="text-fp-text font-medium">{v.vendor_name}</p>
+                          <button onClick={() => navigate(`/vendor?id=${v.id}`)} className="text-fp-text font-medium hover:text-fp-brand text-left">{v.vendor_name}</button>
                         </div>
                         <div>
                           <p className="text-fp-muted text-xs">Contact</p>
@@ -266,6 +268,12 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                         )}
                       </div>
                       <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <button
+                          onClick={() => navigate(`/vendor?id=${v.id}`)}
+                          className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          View
+                        </button>
                         <button
                           onClick={() => startEditing(v)}
                           className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs hover:bg-fp-hover transition-colors"
