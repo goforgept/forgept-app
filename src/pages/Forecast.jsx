@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { stageOf } from '../lib/pipeline'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -65,12 +66,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const stageBreakdown = useMemo(() => {
     return stages.map(stage => {
       const stageProposals = filteredProposals.filter(p => {
-        if (p.pipeline_stage_id) return p.pipeline_stage_id === stage.id
-        if (stage.name === 'Proposal Sent') return !p.pipeline_stage_id && p.status === 'Sent'
-        if (stage.name === 'Won') return !p.pipeline_stage_id && p.status === 'Won'
-        if (stage.name === 'Lost') return !p.pipeline_stage_id && p.status === 'Lost'
-        if (stage.name === 'Lead') return !p.pipeline_stage_id && p.status === 'Draft'
-        return false
+        return stageOf(p, stages)?.id === stage.id
       })
       const value = stageProposals.reduce((sum, p) => sum + pval(p), 0)
       const prob = stage.probability ?? (stage.name === 'Won' ? 100 : stage.name === 'Lost' ? 0 : 40)

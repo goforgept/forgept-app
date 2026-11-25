@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTags, TagEditor } from '../tags/tags'
 
-const STATUS_FALLBACK = { Won: 'Won', Lost: 'Lost', Sent: 'Proposal Sent', Draft: 'Lead' }
+import { stageOf } from '../../lib/pipeline'
 
 function Cell({ label, children, className = '' }) {
   return (
@@ -59,9 +59,7 @@ export default function ProposalHeader({
   const inputCls = "bg-transparent text-fp-text text-sm font-medium focus:outline-none placeholder-fp-muted/30 w-full"
 
   // Stage
-  const activeStageId = proposal?.pipeline_stage_id ||
-    pipelineStages.find(s => s.name === STATUS_FALLBACK[proposal?.status])?.id ||
-    pipelineStages[0]?.id
+  const activeStageId = stageOf(proposal, pipelineStages)?.id
   const activeStage = pipelineStages.find(s => s.id === activeStageId)
 
   // Sent

@@ -46,6 +46,7 @@ import CatalogSearch from '../components/CatalogSearch'
 import { APP_BASE_URL } from '../config'
 import { copyTags } from '../components/tags/tags'
 import FollowupsPanel from '../components/proposal/FollowupsPanel'
+import { statusForStage } from '../lib/pipeline'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -593,11 +594,12 @@ export default function ProposalDetail({ isAdmin }) {
   const updateStage = async (stageId) => {
     const stage = pipelineStages.find(s => s.id === stageId)
     if (!stage) return
-    let newStatus = 'Draft'
-    if (stage.name === 'Won') newStatus = 'Won'
-    else if (stage.name === 'Lost') newStatus = 'Lost'
-    else if (stage.name === 'Proposal Sent') newStatus = 'Sent'
-    await updateStatus(newStatus, stageId)
+    const newStatus = statusForStage(stage, proposal)
+    if (newStatus !== proposal?.status) { await updateStatus(newStatus, stageId); return }
+    // Same status — just a stage label change
+    await supabase.from('proposals').update({ pipeline_stage_id: stageId }).eq('id', id)
+    setProposal(prev => ({ ...prev, pipeline_stage_id: stageId }))
+    logActivity(`Stage changed to ${stage.name}`)
   }
 
   const createLinkedJob = async () => {
@@ -895,6 +897,12 @@ export default function ProposalDetail({ isAdmin }) {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       logActivity(`Signature request sent to ${proposal.client_email}`)
+      // Sending for signature means the client has the quote
+      if (proposal.status === 'Draft') {
+        const sentAt = new Date().toISOString()
+        await supabase.from('proposals').update({ status: 'Sent', sent_at: sentAt }).eq('id', id)
+        setProposal(prev => ({ ...prev, status: 'Sent', sent_at: sentAt }))
+      }
       alert(`✓ Signature request sent to ${proposal.client_email}`)
     } catch (e) {
       alert(`Could not send email. Share this link manually:\n${signingUrl}`)

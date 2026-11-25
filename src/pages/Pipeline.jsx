@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import PipelineStagesModal from '../components/pipeline/PipelineStagesModal'
+import { statusForStage, stageOf } from '../lib/pipeline'
 import { usePermissions } from '../hooks/usePermissions'
 import { useTags, TagList, TagFilter, matchTagFilter, EMPTY_TAG_FILTER } from '../components/tags/tags'
 
@@ -103,14 +104,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const getProposalsForStage = (stage) => {
     const q = search.toLowerCase()
     return filteredProposals.filter(p => {
-      if (p.pipeline_stage_id) { if (p.pipeline_stage_id !== stage.id) return false }
-      else {
-        if (stage.name === 'Proposal Sent' && p.status !== 'Sent') return false
-        else if (stage.name === 'Won' && p.status !== 'Won') return false
-        else if (stage.name === 'Lost' && p.status !== 'Lost') return false
-        else if (stage.name === 'Lead' && p.status !== 'Draft') return false
-        else if (!['Proposal Sent','Won','Lost','Lead'].includes(stage.name)) return false
-      }
+      if (stageOf(p, stages)?.id !== stage.id) return false
       if (clientTypeFilter !== 'all') {
         const client = p.client_id ? clientMap[p.client_id] : null
         const type = client?.client_type || 'commercial'
@@ -139,12 +133,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     e.preventDefault()
     if (!dragging) return
 
-    // Map stage name to proposal status
-    let newStatus = dragging.status
-    if (stage.name === 'Won') newStatus = 'Won'
-    else if (stage.name === 'Lost') newStatus = 'Lost'
-    else if (stage.name === 'Proposal Sent') newStatus = 'Sent'
-    else if (stage.name === 'Lead' || stage.name === 'Contacted' || stage.name === 'Negotiating') newStatus = 'Draft'
+    // Only Won / Lost stages change the status; other stages are labels
+    const newStatus = statusForStage(stage, dragging)
 
     await supabase
       .from('proposals')
