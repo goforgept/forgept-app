@@ -134,3 +134,9 @@ verify_jwt = false
 
 [functions.qbo-oauth-callback]
 verify_jwt = false
+
+[functions.followup-engine]
+verify_jwt = false
+
+[functions.followup-action]
+verify_jwt = false

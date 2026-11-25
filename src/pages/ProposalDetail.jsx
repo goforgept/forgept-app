@@ -45,6 +45,7 @@ import { htmlToPlain, renderHtmlToPdf } from '../components/proposal/RichTextEdi
 import CatalogSearch from '../components/CatalogSearch'
 import { APP_BASE_URL } from '../config'
 import { copyTags } from '../components/tags/tags'
+import FollowupsPanel from '../components/proposal/FollowupsPanel'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -4239,6 +4240,8 @@ const analyzeDrawing = async () => {
             </button>
           </div>
         )}
+
+        <FollowupsPanel proposal={proposal} canEdit={canEdit} />
 
         {profile?.about_us && (
           <div className="bg-fp-card rounded-xl p-6 mb-6">

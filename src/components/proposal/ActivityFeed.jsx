@@ -7,17 +7,8 @@ export default function ActivityFeed({ proposalId, clientId, orgId, refreshKey }
   const [savingActivity, setSavingActivity] = useState(false)
 
   const fetchActivity = async () => {
-    const [{ data: acts }, { data: flogs }] = await Promise.all([
-      supabase.from('activities').select('*, profiles(full_name)').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
-      supabase.from('followup_log').select('proposal_id, days_until_close, created_at, sent_at').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
-    ])
-    const followupItems = (flogs || []).map(f => {
-      const d = f.days_until_close
-      const label = d === 0 ? 'Close-date follow-up sent' : `${d}-day follow-up sent`
-      return { id: `flog_${f.created_at}`, type: 'followup_email', title: label, created_at: f.sent_at || f.created_at, profiles: null, source: 'system' }
-    })
-    const merged = [...(acts || []), ...followupItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    setActivity(merged)
+    const { data: acts } = await supabase.from('activities').select('*, profiles(full_name)').eq('proposal_id', proposalId).order('created_at', { ascending: false })
+    setActivity(acts || [])
   }
 
   useEffect(() => { fetchActivity() }, [proposalId, refreshKey])

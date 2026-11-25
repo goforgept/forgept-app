@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../../supabase'
+
 const VARIABLES = ['{{clientName}}', '{{proposalName}}', '{{proposalValue}}', '{{companyName}}', '{{repName}}']
 const RFQ_VARIABLES = ['{{contactName}}', '{{vendorName}}', '{{proposalName}}', '{{itemCount}}', '{{repName}}', '{{companyName}}']
 const SEND_VARIABLES = ['{{clientName}}', '{{proposalName}}', '{{repName}}', '{{companyName}}']
@@ -11,12 +14,73 @@ const STAGES = [
 
 const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM – 8 PM
+const hourLabel = (h) => `${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`
+
+/** Company-wide follow-up sending: what time they go out, and template vs AI-written drafts. */
+function FollowupSending() {
+  const [org, setOrg] = useState(null)
+  const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: p } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      const { data, error } = await supabase.from('organizations').select('id, timezone, followup_send_hour, followup_ai').eq('id', p.org_id).single()
+      if (error) { setStatus('Follow-up sending settings need a database update first.'); return }
+      setOrg(data)
+    })()
+  }, [])
+
+  const save = async (patch) => {
+    const prev = org
+    setOrg(o => ({ ...o, ...patch })); setStatus('')
+    const { error } = await supabase.from('organizations').update(patch).eq('id', org.id)
+    if (error) { setOrg(prev); setStatus(`Couldn’t save: ${error.message}`) } else setStatus('Saved')
+  }
+
+  return (
+    <div className="bg-fp-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 className="text-fp-text font-bold mb-1">Sending</h3>
+        <p className="text-fp-muted text-sm">The day before each follow-up, the rep gets a preview by email and in their notifications. They can edit or skip it; if they do nothing, it sends at this time. Applies to everyone’s follow-ups.</p>
+      </div>
+      {!org ? <p className="text-fp-muted text-sm">{status || 'Loading…'}</p> : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="fu-hour" className="text-fp-text text-sm font-medium">Send time</label>
+            <select id="fu-hour" value={org.followup_send_hour ?? 9} onChange={e => save({ followup_send_hour: parseInt(e.target.value) })}
+              className="h-9 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 text-sm">
+              {HOURS.map(h => <option key={h} value={h}>{hourLabel(h)}</option>)}
+            </select>
+            <span className="text-fp-muted text-xs">{(org.timezone || 'America/Chicago').replace('_', ' ')} (company time zone)</span>
+          </div>
+          <fieldset className="space-y-2">
+            <legend className="text-fp-text text-sm font-medium mb-1">Who writes them</legend>
+            {[
+              [false, 'Your templates', 'The templates below, filled in with the proposal details.'],
+              [true, 'AI-written, from your templates', 'Uses the proposal’s scope, recent activity and earlier follow-ups to write a short, professional email in the spirit of your template. Never invents prices, dates or promises. Falls back to the template if anything goes wrong.'],
+            ].map(([val, label, hint]) => (
+              <label key={label} className="flex items-start gap-3 cursor-pointer">
+                <input type="radio" name="fu-ai" checked={!!org.followup_ai === val} onChange={() => save({ followup_ai: val })} className="accent-fp-brand mt-1" />
+                <span><span className="block text-fp-text text-sm">{label}</span><span className="block text-fp-muted text-xs">{hint}</span></span>
+              </label>
+            ))}
+          </fieldset>
+          {status && <p role="status" className={`text-xs ${status === 'Saved' ? 'text-green-400' : 'text-red-400'}`}>{status}</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function EmailTemplatesTab({ emailTemplates, setEmailTemplates, expandedStage, setExpandedStage, savingTemplates, handleSaveTemplates }) {
   return (
     <div className="space-y-6">
+      <FollowupSending />
       <div className="bg-fp-card rounded-xl p-5">
         <h3 className="text-fp-text font-bold mb-1">Follow-up Email Templates</h3>
-        <p className="text-fp-muted text-sm mb-4">Customize the emails sent to clients at each stage. Use variables to personalize each message.</p>
+        <p className="text-fp-muted text-sm mb-4">Customize the emails sent to clients at each stage. These apply to the whole team. Use variables to personalize each message.</p>
         <div className="flex flex-wrap gap-2">
           {VARIABLES.map(v => (
             <span key={v} className="bg-fp-inset text-fp-brand text-xs px-2 py-1 rounded font-mono border border-fp-border">{v}</span>

@@ -51,19 +51,8 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId, 
       allActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       setActivities(allActivities)
     } else if (proposalId) {
-      const [{ data: acts }, { data: flogs }] = await Promise.all([
-        supabase.from('activities').select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
-        supabase.from('followup_log').select('proposal_id, days_until_close, created_at, sent_at').eq('proposal_id', proposalId),
-      ])
-      const followupItems = (flogs || []).map(f => ({
-        id: `flog_${f.created_at}`,
-        type: 'followup_email',
-        title: f.days_until_close === 0 ? 'Close-date follow-up sent' : `${f.days_until_close}-day follow-up sent`,
-        created_at: f.sent_at || f.created_at,
-        profiles: null, source: 'system',
-      }))
-      const merged = [...(acts || []), ...followupItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setActivities(merged)
+      const { data: acts } = await supabase.from('activities').select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)').eq('proposal_id', proposalId).order('created_at', { ascending: false })
+      setActivities(acts || [])
     }
 
     setLoading(false)
