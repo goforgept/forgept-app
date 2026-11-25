@@ -4157,7 +4157,7 @@ const analyzeDrawing = async () => {
       const pdfDoc = await generatePDFDoc()
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
       const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({
@@ -4168,7 +4168,10 @@ const analyzeDrawing = async () => {
           primaryColor: profile?.primary_color || '#0F1C2E', pdfBase64
         })
       })
-      setProposal(prev => ({ ...prev, status: 'Sent' }))
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || result.error) throw new Error(result.error || `the email service returned ${res.status}`)
+      // The server stamps sent_at; mirror it here so the date shows without a reload
+      setProposal(prev => ({ ...prev, status: 'Sent', sent_at: new Date().toISOString() }))
       logActivity(`Proposal sent to ${proposal.client_email}`)
       setShowSendModal(false)
       setSendForm({ subject: '', message: '' })
