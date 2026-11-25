@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import GoalsTab from './GoalsTab'
 import { supabase } from '../../supabase'
 import { PERMISSION_AREAS, SCOPEABLE_AREAS, TECH_DEFAULT_PERMISSIONS } from '../../hooks/usePermissions'
 
@@ -437,7 +438,7 @@ function MemberModal({ member, roles, laborRates = [], onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-12 px-4 overflow-y-auto">
-      <div className="bg-fp-card border border-fp-border rounded-2xl w-full max-w-lg mb-12">
+      <div className={`bg-fp-card border border-fp-border rounded-2xl w-full mb-12 ${tab === 'targets' ? 'max-w-4xl' : 'max-w-lg'}`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-fp-border">
           <div>
             <h3 className="text-fp-text font-bold text-base">{member.full_name || member.email}</h3>
@@ -448,7 +449,7 @@ function MemberModal({ member, roles, laborRates = [], onSave, onClose }) {
 
         {/* Inner tabs */}
         <div className="flex gap-1 px-6 pt-3 border-b border-fp-border">
-          {[['info', 'Info'], ['permissions', 'Permissions']].map(([k, l]) => (
+          {[['info', 'Info'], ['permissions', 'Permissions'], ['targets', 'Targets']].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                 tab === k ? 'border-fp-brand text-fp-brand' : 'border-transparent text-fp-muted hover:text-fp-text'
@@ -463,6 +464,8 @@ function MemberModal({ member, roles, laborRates = [], onSave, onClose }) {
 
         <div className="px-6 py-5 space-y-4">
           {error && <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
+
+          {tab === 'targets' && <GoalsTab focusProfileId={member.id} />}
 
           {tab === 'info' && (
             <>
@@ -553,12 +556,12 @@ function MemberModal({ member, roles, laborRates = [], onSave, onClose }) {
 
         <div className="flex gap-3 px-6 py-4 border-t border-fp-border">
           <button onClick={onClose} className="flex-1 py-2 text-sm border border-fp-border text-fp-muted rounded-lg hover:text-fp-text transition-colors">
-            Cancel
+            {tab === 'targets' ? 'Close' : 'Cancel'}
           </button>
-          <button onClick={handleSave} disabled={saving}
+          {tab !== 'targets' && <button onClick={handleSave} disabled={saving}
             className="flex-1 py-2 text-sm font-semibold bg-fp-brand text-white rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
             {saving ? 'Saving...' : 'Save'}
-          </button>
+          </button>}
         </div>
       </div>
     </div>

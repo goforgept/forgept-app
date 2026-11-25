@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
 import Sidebar from '../components/Sidebar'
+import { fetchGoals, indexGoals, recurringGoal, saveGoals, ACTIVITY_METRICS } from '../lib/goals'
 
 const METRICS = [
   { key: 'calls',      label: 'Calls',       icon: '📞' },
@@ -102,20 +103,26 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       { data: actData },
       { data: mtgData },
       { data: propData },
-      { data: tgtData },
+      goalRows,
     ] = await Promise.all([
       supabase.from('profiles').select('id, full_name, org_role, role').eq('org_id', orgId).order('full_name'),
       supabase.from('activities').select('user_id, type, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end).not('source', 'eq', 'system'),
       supabase.from('tasks').select('assigned_to, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end).not('meeting_type', 'is', null),
       supabase.from('proposals').select('user_id, status, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end),
-      supabase.from('rep_kpi_targets').select('*').eq('org_id', orgId).eq('period_type', period),
+      fetchGoals(orgId),
     ])
 
     setReps(repData || [])
     setActivities(actData || [])
     setMeetings(mtgData || [])
     setProposals(propData || [])
-    setTargets(tgtData || [])
+    // Activity goals live in Goals & Targets: each rep's override, else the default for everyone
+    const gIdx = indexGoals(goalRows || [])
+    const gp = period === 'weekly' ? 'week' : 'month'
+    setTargets((repData || []).flatMap(r => ACTIVITY_METRICS.map(m => {
+      const v = recurringGoal(gIdx, r.id, m.key, gp)
+      return v == null ? null : { rep_id: r.id, metric_type: m.key, target_value: v, own: gIdx.has(`${r.id}|${m.key}|${gp}|*`) }
+    }).filter(Boolean)))
     setLoading(false)
   }
 
@@ -150,42 +157,22 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
 
   const openEdit = (rep) => {
     const draft = {}
-    METRICS.forEach(m => { draft[m.key] = getTarget(rep.id, m.key) ?? '' })
+    // Only the rep's own overrides; blank fields fall back to the default for everyone
+    METRICS.forEach(m => { draft[m.key] = targets.find(t => t.rep_id === rep.id && t.metric_type === m.key && t.own)?.target_value ?? '' })
     setTargetDraft(draft)
     setEditingRep(rep.id)
   }
 
   const saveTargets = async () => {
     setSavingTarget(true)
-    const upserts = METRICS
-      .filter(m => targetDraft[m.key] !== '' && targetDraft[m.key] !== null)
-      .map(m => ({
-        org_id: profile.org_id,
-        rep_id: editingRep,
-        set_by: profile.id,
-        metric_type: m.key,
-        target_value: parseInt(targetDraft[m.key]) || 0,
-        period_type: period,
-        updated_at: new Date().toISOString(),
-      }))
-
-    if (upserts.length > 0) {
-      await supabase.from('rep_kpi_targets').upsert(upserts, {
-        onConflict: 'org_id,rep_id,metric_type,period_type',
-        ignoreDuplicates: false,
-      })
-    }
-
-    // Delete zeroed-out targets
-    const zeroed = METRICS.filter(m => parseInt(targetDraft[m.key]) === 0 || targetDraft[m.key] === '')
-    for (const m of zeroed) {
-      await supabase.from('rep_kpi_targets')
-        .delete()
-        .eq('org_id', profile.org_id)
-        .eq('rep_id', editingRep)
-        .eq('metric_type', m.key)
-        .eq('period_type', period)
-    }
+    // Writes this rep's activity goals to Goals & Targets (blank = use the default for everyone)
+    await saveGoals(profile.org_id, profile.id, METRICS.map(m => ({
+      profileId: editingRep,
+      metric: m.key,
+      periodType: period === 'weekly' ? 'week' : 'month',
+      periodStart: null,
+      value: targetDraft[m.key] === '' || targetDraft[m.key] === null || parseInt(targetDraft[m.key]) === 0 ? null : parseInt(targetDraft[m.key]),
+    })))
 
     setEditingRep(null)
     load()

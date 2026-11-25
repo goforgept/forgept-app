@@ -18,6 +18,7 @@ import ApiTab from '../components/settings/ApiTab'
 import AiAgentTab from '../components/settings/AiAgentTab'
 import RegionsTab from '../components/settings/RegionsTab'
 import TagsTab from '../components/settings/TagsTab'
+import GoalsTab from '../components/settings/GoalsTab'
 import GlobalProductsImport from '../components/GlobalProductsImport'
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician, isDevTeam = false }) {
@@ -596,7 +597,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'catalog', label: 'Product Catalog' },
       ]
     }] : []),
-    ...(isAdmin || featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
+    ...(isAdmin || featureDesignerOnly || isSalesManager ? [{ label: 'Team', items: [
+      ...(isAdmin || featureDesignerOnly ? [{ key: 'team', label: 'Team' }] : []),
+      ...((isAdmin || isSalesManager) && !featureDesignerOnly ? [{ key: 'goals', label: 'Goals & Targets' }] : []),
+    ] }] : []),
     { items: [{ key: 'feedback', label: 'Request a Feature' }, { key: 'support', label: 'Support' }] },
   ]
 
@@ -773,6 +777,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           )}
 
           {activeTab === 'team' && <TeamSettingsTab featureDesignerOnly={featureDesignerOnly} />}
+          {activeTab === 'goals' && (isAdmin || isSalesManager) && <GoalsTab />}
 
           {activeTab === 'feedback' && <FeedbackTab profile={profile} />}
 

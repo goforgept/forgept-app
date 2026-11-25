@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { fetchGoals, indexGoals, monthTarget } from '../lib/goals'
 import { useProfile } from '../context/ProfileContext'
 
 const ADMIN_WIDGET_DEFS = [
@@ -65,7 +66,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
-      supabase.from('targets').select('*').eq('org_id', profile.org_id),
+      fetchGoals(profile.org_id),
       supabase.from('invoices').select('*').eq('org_id', profile.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profile.org_id),
       supabase.from('bom_line_items').select('*, proposals(proposal_name, company, client_id, rep_name, user_id)').eq('recurring', true).not('renewal_date', 'is', null),
@@ -90,7 +91,15 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
     const allInvoices = invoicesRes.data || []
     const allPOs      = posRes.data || []
-    const allTargets  = targetsRes.data || []
+    // Targets now come from Goals & Targets (goal_targets); shape them like the old monthly rows
+    const goalIdx = indexGoals(targetsRes || [])
+    const nowD = new Date()
+    const allTargets = (profilesRes.data || []).map(pr => ({
+      profile_id: pr.id,
+      period_start: new Date(nowD.getFullYear(), nowD.getMonth(), 1).toISOString().split('T')[0], // same key the leaderboard looks up
+      revenue_target: monthTarget(goalIdx, pr.id, 'revenue_won', nowD.getFullYear(), nowD.getMonth()),
+      deals_target: monthTarget(goalIdx, pr.id, 'deals_won', nowD.getFullYear(), nowD.getMonth()),
+    })).filter(t => t.revenue_target != null || t.deals_target != null)
 
     setProposals(scopedProposals)
     setJobs(jobsRes.data || [])
@@ -1030,10 +1039,10 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <h3 className="text-fp-text font-bold text-lg">Rep Targets — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
               <p className="text-fp-muted text-xs mt-0.5">Monthly revenue goals vs actuals</p>
             </div>
-            <button onClick={() => setShowSetTargetModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors">Set Target</button>
+            <button onClick={() => navigate('/settings#goals')} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors">Set targets</button>
           </div>
           {repTargets.length === 0 ? (
-            <p className="text-fp-muted text-sm">No targets set yet. Click "Set Target" to assign monthly goals to your reps.</p>
+            <p className="text-fp-muted text-sm">No targets set yet. Click "Set targets" to set them in Goals &amp; Targets.</p>
           ) : (
             <div className="space-y-4">
               {repTargets.map(rep => (

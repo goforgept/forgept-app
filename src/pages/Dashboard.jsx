@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../supabase'
+import { fetchGoals, indexGoals, monthTarget, recurringGoal, ACTIVITY_METRICS } from '../lib/goals'
 import Sidebar from '../components/Sidebar'
 import { usePermissions } from '../hooks/usePermissions'
 
@@ -165,8 +166,8 @@ function KPIWidget({ userId, orgId }) {
         .gte('created_at', start).lt('created_at', end).not('meeting_type', 'is', null),
       supabase.from('proposals').select('status').eq('org_id', orgId).eq('user_id', userId)
         .gte('created_at', start).lt('created_at', end),
-      supabase.from('rep_kpi_targets').select('metric_type, target_value').eq('org_id', orgId).eq('rep_id', userId).eq('period_type', period),
-    ]).then(([{ data: acts }, { data: mtgs }, { data: props }, { data: tgts }]) => {
+      fetchGoals(orgId),
+    ]).then(([{ data: acts }, { data: mtgs }, { data: props }, tgts]) => {
       const a = { calls: 0, emails: 0, meetings: (mtgs || []).length, notes: 0, proposals: (props || []).length, deals_won: 0 }
       ;(acts || []).forEach(x => {
         if (x.type === 'call')    a.calls++
@@ -175,8 +176,13 @@ function KPIWidget({ userId, orgId }) {
         else if (x.type === 'note')    a.notes++
       })
       ;(props || []).forEach(p => { if (p.status === 'Won') a.deals_won++ })
+      // Activity goals from Goals & Targets: this rep's override, else the default for everyone
+      const gIdx = indexGoals(tgts || [])
       const t = {}
-      ;(tgts || []).forEach(r => { t[r.metric_type] = r.target_value })
+      for (const m of ACTIVITY_METRICS) {
+        const v = recurringGoal(gIdx, userId, m.key, period === 'weekly' ? 'week' : 'month')
+        if (v != null) t[m.key] = v
+      }
       setActuals(a)
       setKpiTargets(t)
       setLoading(false)
@@ -347,12 +353,18 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
 
     const [proposalsRes, targetRes, invoicesRes, posRes] = await Promise.all([
       supabase.from('proposals').select('*').eq('org_id', profileData.org_id).eq('user_id', user.id).eq('is_current_revision', true).is('archived_at', null).order('created_at', { ascending: false }),
-      supabase.from('targets').select('*').eq('profile_id', user.id).eq('period', 'monthly').gte('period_start', monthStart).maybeSingle(),
+      fetchGoals(profileData.org_id),
       supabase.from('invoices').select('*').eq('org_id', profileData.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profileData.org_id),
     ])
     setProposals(proposalsRes.data || [])
-    setTarget(targetRes.data || null)
+    {
+      // This month's revenue / deal targets from Goals & Targets
+      const gIdx = indexGoals(targetRes || [])
+      const rev = monthTarget(gIdx, user.id, 'revenue_won', now.getFullYear(), now.getMonth())
+      const deals = monthTarget(gIdx, user.id, 'deals_won', now.getFullYear(), now.getMonth())
+      setTarget(rev != null || deals != null ? { revenue_target: rev || 0, deals_target: deals || 0, period_start: monthStart } : null)
+    }
     setInvoices(invoicesRes.data || [])
     setPurchaseOrders(posRes.data || [])
 
@@ -428,7 +440,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     })
 
   const wonPipeline    = periodProposals.filter(p => p.status === 'Won').reduce((s, p) => s + pval(p), 0)
-  const targetProgress = target ? Math.min(100, Math.round((wonPipeline / target.revenue_target) * 100)) : null
+  const targetProgress = target?.revenue_target > 0 ? Math.min(100, Math.round((wonPipeline / target.revenue_target) * 100)) : null
 
   const laborQuoted = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((s, p) => s + (p.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0), 0)
   const laborWon    = proposals.filter(p => p.status === 'Won').reduce((s, p) => s + (p.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0), 0)
