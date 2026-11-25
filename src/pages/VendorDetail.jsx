@@ -6,7 +6,33 @@ import Sidebar from '../components/Sidebar'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
 import { Card, Empty, Ring, Donut, LegendRow, Chip, Row, Eyebrow, Skeleton } from '../dashboard/ui'
-import { money, moneyShort, plural, splitByPeriod, PERIODS, PERIOD_SHORT, STAGE_COLOR, SERIES, C, shortDate } from '../dashboard/util'
+import { money, moneyShort, plural, periodStart, PERIODS, PERIOD_SHORT, STAGE_COLOR, SERIES, C, shortDate } from '../dashboard/util'
+import { exportVendorReport } from '../lib/vendorReportPdf'
+
+// Periods for this page: the dashboard's, plus last full quarter (the usual QBR window)
+const VENDOR_PERIODS = { last_q: 'Last quarter', ...PERIODS }
+function periodRange(period) {
+  const now = new Date()
+  if (period === 'last_q') {
+    const qs = Math.floor(now.getMonth() / 3) * 3
+    const start = new Date(now.getFullYear(), qs - 3, 1), end = new Date(now.getFullYear(), qs, 1)
+    const q = Math.floor(start.getMonth() / 3) + 1
+    return { start, end, label: `Q${q} ${start.getFullYear()}` }
+  }
+  return { start: periodStart(period), end: null, label: VENDOR_PERIODS[period] }
+}
+/** Open deals count by when they were sent/created; won and lost by when they closed. */
+function splitRange(proposals, start, end) {
+  const inR = (d) => { const t = new Date(d); return (!start || t >= start) && (!end || t < end) }
+  const inPeriod = proposals.filter(p => inR(p.status === 'Sent' ? (p.sent_at || p.created_at) : p.created_at))
+  return {
+    inPeriod,
+    won: proposals.filter(p => p.status === 'Won' && inR(p.updated_at || p.created_at)),
+    lost: proposals.filter(p => p.status === 'Lost' && inR(p.updated_at || p.created_at)),
+  }
+}
+const readLS = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const writeLS = (k, v) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } }
 
 const norm = (s) => (s || '').trim().toLowerCase()
 
@@ -33,7 +59,12 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
   const [lines, setLines] = useState([])
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState('all')
+  const [period, setPeriod] = useState('last_q')
+  const [showExport, setShowExport] = useState(false)
+  const [include, setInclude] = useState({ pos: true, parts: true, proposals: false })
+  const [exporting, setExporting] = useState(false)
+  const [partsOpen, setPartsOpen] = useState(() => readLS('vendor_parts_open') === '1')
+  const togglParts = () => setPartsOpen(o => { writeLS('vendor_parts_open', o ? '0' : '1'); return !o })
 
   useEffect(() => {
     if (!profile?.org_id) return
@@ -70,7 +101,8 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
 
   const stats = useMemo(() => {
     const withVendor = new Set(lines.map(l => l.proposal_id))
-    const split = splitByPeriod(proposals.filter(p => withVendor.has(p.id)), period)
+    const { start, end } = periodRange(period)
+    const split = splitRange(proposals.filter(p => withVendor.has(p.id)), start, end)
     const quotedIds = new Set(split.inPeriod.map(p => p.id)), wonIds = new Set(split.won.map(p => p.id))
     const blank = () => ({ rev: 0, cost: 0, qty: 0 })
     const q = blank(), w = blank()
@@ -121,7 +153,19 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
   const wonPct = stats.q.rev > 0 ? stats.w.rev / stats.q.rev * 100 : 0
   const margin = stats.w.rev > 0 ? (stats.w.rev - stats.w.cost) / stats.w.rev * 100 : null
   const winRate = stats.won + stats.lost > 0 ? Math.round(stats.won / (stats.won + stats.lost) * 100) : null
-  const ps = PERIOD_SHORT[period]
+  const range = periodRange(period)
+  const ps = period === 'last_q' ? range.label : PERIOD_SHORT[period]
+  const rangeText = range.start
+    ? `${range.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – ${(range.end ? new Date(range.end - 1) : new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : ''
+  const runExport = async () => {
+    setExporting(true)
+    try {
+      await exportVendorReport({ profile, vendor, periodLabel: period === 'last_q' ? range.label : VENDOR_PERIODS[period], rangeText, stats, poStats, pos, include })
+      setShowExport(false)
+    } catch (e) { console.error('vendor export:', e); alert('The PDF could not be created. Please try again.') }
+    setExporting(false)
+  }
 
   return (
     <div className="flex h-screen bg-fp-bg">
@@ -145,8 +189,10 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
               <label htmlFor="vendor-period" className="sr-only">Period</label>
               <select id="vendor-period" value={period} onChange={e => setPeriod(e.target.value)}
                 className="h-10 bg-fp-card border border-fp-border text-fp-text text-sm font-medium rounded-xl px-3 focus:outline-none focus:border-fp-brand">
-                {Object.entries(PERIODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                {Object.entries(VENDOR_PERIODS).map(([k, l]) => <option key={k} value={k}>{k === 'last_q' ? `${l} (${periodRange('last_q').label})` : l}</option>)}
               </select>
+              <button onClick={() => setShowExport(true)} disabled={loading}
+                className="h-10 px-4 rounded-xl bg-fp-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">Export PDF</button>
             </div>
           </header>
 
@@ -223,9 +269,13 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
 
               {/* Parts */}
               <div className="col-span-12">
-                <Card title="Parts from this vendor" sub={`${plural(stats.parts.length, 'part')}${ps ? ` · ${ps}` : ''}`}>
-                  {stats.parts.length === 0 ? <Empty>No parts quoted from this vendor in this period.</Empty> : (
-                    <div className="overflow-x-auto -mx-1">
+                <Card title="Parts from this vendor" sub={`${plural(stats.parts.length, 'part')}${ps ? ` · ${ps}` : ''}`}
+                  right={stats.parts.length > 0 && (
+                    <button onClick={togglParts} aria-expanded={partsOpen} aria-controls="vendor-parts"
+                      className="text-fp-brand hover:opacity-80 text-[13px] font-medium whitespace-nowrap">{partsOpen ? 'Hide parts ▴' : `Show ${plural(stats.parts.length, 'part')} ▾`}</button>
+                  )}>
+                  {!partsOpen && stats.parts.length > 0 ? null : stats.parts.length === 0 ? <Empty>No parts quoted from this vendor in this period.</Empty> : (
+                    <div id="vendor-parts" className="overflow-x-auto -mx-1">
                       <table className="w-full text-sm border-collapse">
                         <thead>
                           <tr className="text-fp-muted text-xs">
@@ -271,6 +321,34 @@ export default function VendorDetail({ isAdmin, featureProposals = true, feature
           )}
         </div>
       </main>
+
+      {showExport && (
+        <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center px-4" onClick={() => !exporting && setShowExport(false)}>
+          <div role="dialog" aria-label="Export vendor review" className="bg-fp-card border border-fp-border rounded-2xl p-6 w-full max-w-md flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <h3 className="text-fp-text font-bold text-lg">Export business review</h3>
+              <p className="text-fp-muted text-sm mt-1">{vendor?.vendor_name} · {period === 'last_q' ? range.label : VENDOR_PERIODS[period]}. Your logo and company name go on the letterhead.</p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <p className="text-fp-muted text-xs">Always included: key numbers and manufacturer mix.</p>
+              {[
+                ['pos', 'Purchase orders', 'PO numbers, dates, status and amounts'],
+                ['parts', 'Top parts', 'Quantities and dollars quoted vs won'],
+                ['proposals', 'Proposals', 'Includes your client names. Leave off if this goes to the vendor.'],
+              ].map(([k, label, hint]) => (
+                <label key={k} htmlFor={`vx-${k}`} className="flex items-start gap-3 cursor-pointer">
+                  <input id={`vx-${k}`} type="checkbox" checked={include[k]} onChange={e => setInclude(i => ({ ...i, [k]: e.target.checked }))} className="accent-fp-brand w-4 h-4 mt-0.5" />
+                  <span><span className="block text-fp-text text-sm font-medium">{label}</span><span className="block text-fp-muted text-xs">{hint}</span></span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setShowExport(false)} disabled={exporting} className="h-9 px-4 text-fp-muted hover:text-fp-text text-sm">Cancel</button>
+              <button onClick={runExport} disabled={exporting} className="h-9 px-4 rounded-lg bg-fp-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">{exporting ? 'Creating…' : 'Download PDF'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
